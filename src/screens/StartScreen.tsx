@@ -15,7 +15,7 @@ export function StartScreen() {
           onClick={() => navigate('timeSheet')}
           className="flex flex-col items-center active:scale-[0.97] transition-transform"
         >
-          <div className="font-display font-extrabold text-[64px] sm:text-[80px] leading-none text-ink">
+          <div className="font-display font-extrabold text-[64px] sm:text-[80px] leading-none tabular-nums text-ink">
             {formatTime(state.remainingSeconds)}
           </div>
           <div className="flex items-center gap-1.5 mt-1.5">

@@ -28,7 +28,7 @@ export function WidgetPreviewScreen({ onBack }: { onBack: () => void }) {
         ← Zurück
       </button>
       <div className="text-center mb-6">
-        <div className="font-display text-[42px] sm:text-[50px] font-bold">{clockTime}</div>
+        <div className="font-display text-[42px] sm:text-[50px] font-bold tabular-nums">{clockTime}</div>
         <div className="text-[12px] opacity-70 mt-0.5 font-semibold capitalize">{clockDate}</div>
       </div>
 
@@ -38,7 +38,7 @@ export function WidgetPreviewScreen({ onBack }: { onBack: () => void }) {
         </div>
         <div className="flex-1">
           <div className="text-[10px] font-bold opacity-65 uppercase tracking-wide">Fokusgarten · läuft</div>
-          <div className="font-display text-[17px] font-bold mt-0.5">{formatTime(state.remainingSeconds)} verbleibend</div>
+          <div className="font-display text-[17px] font-bold tabular-nums mt-0.5">{formatTime(state.remainingSeconds)} verbleibend</div>
         </div>
         <FruitIcon type={fruit} size={28} />
       </div>
@@ -56,7 +56,7 @@ export function WidgetPreviewScreen({ onBack }: { onBack: () => void }) {
                 <FruitIcon type={platform === 'iOS' ? 'tomato' : 'carrot'} size={22} />
               </div>
             </div>
-            <div className="font-display font-bold text-[14px]">{formatTime(state.remainingSeconds)}</div>
+            <div className="font-display font-bold text-[14px] tabular-nums">{formatTime(state.remainingSeconds)}</div>
             <div className="text-[9.5px] text-ink-soft font-bold mt-0.5">Fokuszeit</div>
           </div>
         ))}

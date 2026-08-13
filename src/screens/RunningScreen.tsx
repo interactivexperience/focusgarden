@@ -75,7 +75,9 @@ export function RunningScreen() {
       onPointerLeave={endHold}
       onPointerCancel={cancelHold}
     >
-      <div className={`font-display font-extrabold text-[64px] sm:text-[76px] leading-none transition-colors ${timeColor}`}>
+      <div
+        className={`font-display font-extrabold text-[64px] sm:text-[76px] leading-none tabular-nums transition-colors ${timeColor}`}
+      >
         {formatTime(state.remainingSeconds)}
       </div>
 
