@@ -28,61 +28,42 @@ export const SUNFLOWER_IMAGES = keyByFilename(sunflowerModules)
 
 export type IconName = keyof typeof ICON_IMAGES
 
-/** Avocado hat keine Vektor-Vorlage – handgezeichneter Fallback im selben Sticker-Stil. */
-function AvocadoIcon({ size = 64, className }: { size?: number; className?: string }) {
+/** Mais-Vorlage war beim Export aus der EPS oben abgeschnitten – handgezeichneter Fallback im selben Sticker-Stil. */
+function CornIcon({ size = 64, className }: { size?: number; className?: string }) {
+  const outline = { stroke: '#2B2118', strokeWidth: 6, style: { paintOrder: 'stroke' as const } }
+  const outlineSm = { stroke: '#2B2118', strokeWidth: 4, style: { paintOrder: 'stroke' as const } }
   return (
-    <svg
-      viewBox="0 0 120 120"
-      width={size}
-      height={size}
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        d="M60 18 Q58 8 64 4"
-        stroke="#8B5A3C"
-        strokeWidth={4}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <path
-        d="M60 18 C50 18 46 32 48 44 C30 50 22 68 24 84 C26 102 42 112 60 112 C78 112 94 102 96 84 C98 68 90 50 72 44 C74 32 70 18 60 18 Z"
-        fill="#7FAE5E"
-        stroke="#2B2118"
-        strokeWidth={6}
-        style={{ paintOrder: 'stroke' }}
-      />
-      <circle
-        cx={60}
-        cy={80}
-        r={26}
-        fill="#EAD9A8"
-        stroke="#2B2118"
-        strokeWidth={4}
-        style={{ paintOrder: 'stroke' }}
-      />
-      <circle
-        cx={60}
-        cy={80}
-        r={15}
-        fill="#8B5A3C"
-        stroke="#2B2118"
-        strokeWidth={4}
-        style={{ paintOrder: 'stroke' }}
-      />
-      <circle cx={46} cy={40} r={5.8} fill="#2B2118" />
-      <circle cx={44} cy={37.5} r={1.4} fill="#fff" />
-      <circle cx={74} cy={40} r={5.8} fill="#2B2118" />
-      <circle cx={72} cy={37.5} r={1.4} fill="#fff" />
-      <path
-        d="M53 49 Q60 54 67 49"
-        stroke="#2B2118"
-        strokeWidth={2.6}
-        fill="none"
-        strokeLinecap="round"
-      />
+    <svg viewBox="0 0 120 120" width={size} height={size} className={className} aria-hidden="true">
+      <rect x={34} y={10} width={52} height={100} rx={24} fill="#FFD75E" {...outline} />
+      <g fill="#EFC24A">
+        <circle cx={46} cy={28} r={4.3} />
+        <circle cx={60} cy={24} r={4.3} />
+        <circle cx={74} cy={28} r={4.3} />
+        <circle cx={40} cy={42} r={4.3} />
+        <circle cx={53} cy={40} r={4.3} />
+        <circle cx={67} cy={40} r={4.3} />
+        <circle cx={80} cy={42} r={4.3} />
+        <circle cx={46} cy={56} r={4.3} />
+        <circle cx={60} cy={54} r={4.3} />
+        <circle cx={74} cy={56} r={4.3} />
+        <circle cx={40} cy={70} r={4.3} />
+        <circle cx={53} cy={68} r={4.3} />
+        <circle cx={67} cy={68} r={4.3} />
+        <circle cx={80} cy={70} r={4.3} />
+      </g>
+      <path d="M30 78 Q14 88 22 102 Q12 106 16 116 L34 110 Q26 100 32 90 Z" fill="#6FA96C" {...outlineSm} />
+      <path d="M90 78 Q106 88 98 102 Q108 106 104 116 L86 110 Q94 100 88 90 Z" fill="#4C8A52" {...outlineSm} />
+      <circle cx={46} cy={80} r={5.8} fill="#2B2118" />
+      <circle cx={44} cy={77.5} r={1.4} fill="#fff" />
+      <circle cx={74} cy={80} r={5.8} fill="#2B2118" />
+      <circle cx={72} cy={77.5} r={1.4} fill="#fff" />
+      <path d="M53 89 Q60 94 67 89" stroke="#2B2118" strokeWidth={2.6} fill="none" strokeLinecap="round" />
     </svg>
   )
+}
+
+const HAND_DRAWN_FALLBACKS: Partial<Record<FruitType, typeof CornIcon>> = {
+  corn: CornIcon,
 }
 
 export function FruitIcon({
@@ -95,7 +76,10 @@ export function FruitIcon({
   className?: string
 }) {
   const src = FRUIT_IMAGES[type]
-  if (!src) return <AvocadoIcon size={size} className={className} />
+  if (!src) {
+    const Fallback = HAND_DRAWN_FALLBACKS[type]
+    return Fallback ? <Fallback size={size} className={className} /> : null
+  }
   return (
     <img
       src={src}
@@ -136,13 +120,7 @@ export function AppIcon({
   )
 }
 
-export type SunflowerMood = 'awake' | 'sleepy' | 'holding'
-
-const SUNFLOWER_MOOD_KEY: Record<SunflowerMood, string> = {
-  awake: 'happy',
-  sleepy: 'tired',
-  holding: 'shock',
-}
+export type SunflowerMood = keyof typeof SUNFLOWER_IMAGES
 
 export function SunflowerIcon({
   mood,
@@ -153,7 +131,7 @@ export function SunflowerIcon({
   size?: number
   className?: string
 }) {
-  const src = SUNFLOWER_IMAGES[SUNFLOWER_MOOD_KEY[mood]]
+  const src = SUNFLOWER_IMAGES[mood]
   return (
     <img
       src={src}

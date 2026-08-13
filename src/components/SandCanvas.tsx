@@ -24,7 +24,6 @@ const FRUIT_COLOR: Partial<Record<FruitType, string>> = {
   blueberry: '#7B93E0',
   carrot: '#FFA552',
   eggplant: '#9B7EDE',
-  avocado: '#7FAE5E',
   corn: '#FFD75E',
   broccoli: '#5F9A5A',
   pumpkin: '#F5943A',

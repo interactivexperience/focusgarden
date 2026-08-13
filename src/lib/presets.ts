@@ -11,7 +11,7 @@ export interface TimePreset {
 export const TIME_PRESETS: TimePreset[] = [
   { name: 'Pomodoro', minutes: 25, breakMinutes: 5, standard: true, icon: 'tomato' },
   { name: 'Lang-Pomodoro', minutes: 50, breakMinutes: 10, icon: 'corn' },
-  { name: '52/17-Methode', minutes: 52, breakMinutes: 17, icon: 'avocado' },
+  { name: '52/17-Methode', minutes: 52, breakMinutes: 17, icon: 'kiwi' },
   { name: 'Ultradian Rhythm', minutes: 90, breakMinutes: 20, icon: 'eggplant' },
 ]
 

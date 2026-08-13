@@ -32,10 +32,10 @@ veröffentlicht sie auf GitHub Pages unter `/focusgarden/`.
 
 ## Assets
 
-Die 38 Obst-/Gemüse-Icons, 8 Sonnenblumen-Stimmungen und 24 UI-Icons stammen aus der vom
+Die 37 Obst-/Gemüse-Icons, 8 Sonnenblumen-Stimmungen und 24 UI-Icons stammen aus der vom
 Nutzer bereitgestellten Vektor-Vorlage und liegen als echte PNG-Dateien unter
-`src/assets/`. Avocado hat keine Vorlage und wird als handgezeichnetes SVG dargestellt
-(`src/lib/assets.tsx`).
+`src/assets/`. Mais war beim Export aus der EPS oben abgeschnitten und wird deshalb als
+handgezeichnetes SVG im selben Sticker-Stil dargestellt (`src/lib/assets.tsx`).
 
 ## Offene Punkte
 

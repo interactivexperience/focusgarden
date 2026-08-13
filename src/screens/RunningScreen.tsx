@@ -6,11 +6,14 @@ import { useFocusGarden } from '../state/store'
 const HOLD_MS = 900
 const IDLE_HINT = 'Bildschirm antippen zum Pausieren · Lang halten zum Beenden'
 const PAUSE_HINT = 'Pausiert – zum Fortsetzen tippen'
+/** Je öfter innerhalb einer Sitzung gehalten wird, desto genervter schaut die Sonnenblume. */
+const HOLD_MOOD_CYCLE = ['shock', 'sad', 'wink'] as const
 
 export function RunningScreen() {
   const { state, togglePause, resetAfterStop } = useFocusGarden()
   const [holding, setHolding] = useState(false)
   const [stopped, setStopped] = useState(false)
+  const [holdAttempts, setHoldAttempts] = useState(0)
   const holdStartRef = useRef(0)
   const holdTimerRef = useRef<number | null>(null)
 
@@ -18,6 +21,7 @@ export function RunningScreen() {
     if (stopped) return
     holdStartRef.current = Date.now()
     setHolding(true)
+    setHoldAttempts((n) => n + 1)
     holdTimerRef.current = window.setTimeout(() => {
       setHolding(false)
       setStopped(true)
@@ -73,7 +77,11 @@ export function RunningScreen() {
           animationPlayState: paused ? 'paused' : 'running',
         }}
       >
-        <SunflowerIcon mood={holding ? 'holding' : paused ? 'sleepy' : 'awake'} size={92} className="w-full block" />
+        <SunflowerIcon
+          mood={holding ? HOLD_MOOD_CYCLE[(holdAttempts - 1) % HOLD_MOOD_CYCLE.length] : paused ? 'tired' : 'happy'}
+          size={92}
+          className="w-full block"
+        />
       </div>
 
       <div className={`text-[12px] font-bold text-center max-w-[220px] leading-relaxed transition-colors ${hintColor}`}>
