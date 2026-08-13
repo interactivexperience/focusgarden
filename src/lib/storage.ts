@@ -18,8 +18,17 @@ export interface StoredState {
 
 const STORAGE_KEY = 'fokusgarten_state_v1'
 
+/**
+ * Lokales Kalenderdatum (nicht UTC!) als "YYYY-MM-DD". `toISOString()` würde
+ * in Zeitzonen östlich von UTC (z.B. Deutschland) rund um Mitternacht noch
+ * den Vortag liefern und damit Tageswechsel-Logik (Streak, Tages-Ernte) verschieben.
+ */
 export function todayDateKey(): string {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 /**

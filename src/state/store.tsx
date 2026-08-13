@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useReducer, useRef, type ReactNod
 import { type FruitType, randomFruitType } from '../lib/fruits'
 import { presetForMinutes, TIME_PRESETS } from '../lib/presets'
 import { loadStoredState, saveStoredState, todayDateKey, type SoundState, type StoredState } from '../lib/storage'
+import { streakOnHarvest, streakOnNewDay } from '../lib/streak'
 
 export type Screen =
   | 'start'
@@ -26,14 +27,10 @@ interface State {
   discoveredTypes: FruitType[]
   streak: number
   lastHarvestDate: string
+  /** Kalendertag (lokal), auf den sich `todaysHarvest` gerade bezieht – erlaubt einen
+   *  Tageswechsel zu erkennen, während die App offen bleibt (kein Reload über Mitternacht). */
+  activeDayKey: string
   harvestReplayTick: number
-}
-
-function daysBetween(fromKey: string, toKey: string): number {
-  const from = Date.parse(fromKey)
-  const to = Date.parse(toKey)
-  if (Number.isNaN(from) || Number.isNaN(to)) return Infinity
-  return Math.round((to - from) / 86400000)
 }
 
 const DEFAULT_MINUTES = 25
@@ -57,14 +54,14 @@ function initState(): State {
       discoveredTypes: [],
       streak: 0,
       lastHarvestDate: '',
+      activeDayKey: today,
       harvestReplayTick: 0,
     }
   }
 
   const lastHarvestDate = stored.lastHarvestDate ?? ''
   const isNewDay = lastHarvestDate !== today
-  const gap = daysBetween(lastHarvestDate, today)
-  const streak = isNewDay && gap > 1 ? 0 : (stored.streak ?? 0)
+  const streak = isNewDay ? streakOnNewDay(stored.streak ?? 0, lastHarvestDate, today) : (stored.streak ?? 0)
   const totalSeconds = stored.totalSeconds ?? DEFAULT_MINUTES * 60
   const pendingMinutes = stored.pendingMinutes ?? DEFAULT_MINUTES
   const preset = presetForMinutes(pendingMinutes)
@@ -82,6 +79,7 @@ function initState(): State {
     discoveredTypes: stored.discoveredTypes ?? [],
     streak,
     lastHarvestDate,
+    activeDayKey: today,
     harvestReplayTick: 0,
   }
 }
@@ -93,6 +91,7 @@ type Action =
   | { type: 'APPLY_TIME' }
   | { type: 'START_SESSION' }
   | { type: 'TICK' }
+  | { type: 'CHECK_DAY_ROLLOVER' }
   | { type: 'TOGGLE_PAUSE' }
   | { type: 'RESET_AFTER_STOP' }
   | { type: 'REPLAY_HARVEST' }
@@ -134,24 +133,38 @@ function reducer(state: State, action: Action): State {
 
       const type = randomFruitType()
       const today = todayDateKey()
-      const alreadyHarvestedToday = state.lastHarvestDate === today
-      const gap = daysBetween(state.lastHarvestDate, today)
-      const streak = alreadyHarvestedToday ? state.streak : gap === 1 ? state.streak + 1 : 1
+      const streak = streakOnHarvest(state.streak, state.lastHarvestDate, today)
       const discoveredTypes = state.discoveredTypes.includes(type)
         ? state.discoveredTypes
         : [...state.discoveredTypes, type]
+      // Falls die App über Mitternacht hinweg offen blieb (kein CHECK_DAY_ROLLOVER
+      // dazwischen), hier defensiv den Tages-Eimer für die neue Ernte leeren,
+      // statt sie an gestriges todaysHarvest anzuhängen.
+      const todaysHarvest = state.activeDayKey === today ? [...state.todaysHarvest, type] : [type]
 
       return {
         ...state,
         remainingSeconds: state.totalSeconds,
         sessionPaused: false,
         screen: 'harvest',
-        todaysHarvest: [...state.todaysHarvest, type],
+        todaysHarvest,
         lastHarvestType: type,
         lastHarvestDate: today,
+        activeDayKey: today,
         streak,
         discoveredTypes,
         harvestReplayTick: state.harvestReplayTick + 1,
+      }
+    }
+
+    case 'CHECK_DAY_ROLLOVER': {
+      const today = todayDateKey()
+      if (state.activeDayKey === today) return state
+      return {
+        ...state,
+        activeDayKey: today,
+        todaysHarvest: [],
+        streak: streakOnNewDay(state.streak, state.lastHarvestDate, today),
       }
     }
 
@@ -203,6 +216,20 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
       }
     }, 1000)
     return () => window.clearInterval(id)
+  }, [])
+
+  // Erkennt einen Tageswechsel, während die App offen bleibt (kein Reload über
+  // Mitternacht hinweg) und setzt dann todaysHarvest/Streak zurück. 30s reicht,
+  // da sich der Kalendertag nur einmal täglich ändert; auch beim Rückkehren aus
+  // dem Hintergrund (visibilitychange) direkt prüfen, falls der Timer gedrosselt wurde.
+  useEffect(() => {
+    const check = () => dispatch({ type: 'CHECK_DAY_ROLLOVER' })
+    const id = window.setInterval(check, 30_000)
+    document.addEventListener('visibilitychange', check)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', check)
+    }
   }, [])
 
   useEffect(() => {
