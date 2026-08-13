@@ -1,0 +1,50 @@
+import type { FruitType } from './fruits'
+
+export interface SoundState {
+  focusEnd: boolean
+  breakEnd: boolean
+  haptics: boolean
+}
+
+export interface StoredState {
+  todaysHarvest: FruitType[]
+  totalSeconds: number
+  pendingMinutes: number
+  soundState: SoundState
+  lastHarvestDate: string
+  discoveredTypes: FruitType[]
+  streak: number
+}
+
+const STORAGE_KEY = 'fokusgarten_state_v1'
+
+export function todayDateKey(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/**
+ * Einzige Stelle, die lokalen Zustand liest. Bei einem späteren Cloud-Backend
+ * wird hier zusätzlich aus der Datenbank gelesen – der Rest der App bleibt unangetastet.
+ */
+export function loadStoredState(): StoredState | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as StoredState
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Einzige Stelle, die lokalen Zustand schreibt. Bei einem späteren Cloud-Backend
+ * wird hier zusätzlich in die Datenbank geschrieben – der Rest der App bleibt unangetastet.
+ */
+export function saveStoredState(state: StoredState) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // localStorage kann in seltenen Fällen (Private Mode, voller Speicher) fehlschlagen –
+    // die App bleibt in diesem Fall innerhalb der Session weiter benutzbar.
+  }
+}

@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Baloo 2", sans-serif;
+  --font-body: "Quicksand", sans-serif;
+
+  --color-bg-page: #dce9ec;
+  --color-bg-app: #eaf4e4;
+  --color-bg-card: #ffffff;
+  --color-ink: #3d3a34;
+  --color-ink-soft: #8a8172;
+  --color-ink-faint: #b3ac9e;
+  --color-line: #e7e2d6;
+  --color-leaf: #6fa96c;
+  --color-leaf-dark: #4c8a52;
+  --color-leaf-pale: #dceed7;
+  --color-stop: #e5493b;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: "Quicksand", sans-serif;
+  background:
+    radial-gradient(circle at 15% 10%, #eff7ee 0%, transparent 45%),
+    radial-gradient(circle at 85% 90%, #dff0e6 0%, transparent 50%),
+    var(--color-bg-page);
+  color: var(--color-ink);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@keyframes sheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sproutBounce {
+  0%,
+  100% {
+    transform: scale(1, 1) translateY(0);
+  }
+  30% {
+    transform: scale(1.06, 0.94) translateY(2px);
+  }
+  55% {
+    transform: scale(0.93, 1.09) translateY(-7px);
+  }
+  80% {
+    transform: scale(1.02, 0.98) translateY(0);
+  }
+}
+
+@keyframes holdBarFill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
