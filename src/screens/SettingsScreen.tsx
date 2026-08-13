@@ -33,7 +33,7 @@ function ToggleRow({
         style={{ background: on ? 'var(--color-leaf)' : '#DCD6C8' }}
       >
         <span
-          className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.25)] transition-transform"
+          className="absolute top-[3px] left-[3px] w-5 h-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.25)] transition-transform"
           style={{ transform: on ? 'translateX(18px)' : 'translateX(0)' }}
         />
       </button>

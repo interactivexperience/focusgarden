@@ -136,7 +136,13 @@ export function AppIcon({
   )
 }
 
-export type SunflowerMood = 'awake' | 'sleepy'
+export type SunflowerMood = 'awake' | 'sleepy' | 'holding'
+
+const SUNFLOWER_MOOD_KEY: Record<SunflowerMood, string> = {
+  awake: 'happy',
+  sleepy: 'tired',
+  holding: 'shock',
+}
 
 export function SunflowerIcon({
   mood,
@@ -147,8 +153,7 @@ export function SunflowerIcon({
   size?: number
   className?: string
 }) {
-  const key = mood === 'sleepy' ? 'tired' : 'happy'
-  const src = SUNFLOWER_IMAGES[key]
+  const src = SUNFLOWER_IMAGES[SUNFLOWER_MOOD_KEY[mood]]
   return (
     <img
       src={src}

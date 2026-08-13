@@ -73,7 +73,7 @@ export function RunningScreen() {
           animationPlayState: paused ? 'paused' : 'running',
         }}
       >
-        <SunflowerIcon mood={paused ? 'sleepy' : 'awake'} size={92} className="w-full block" />
+        <SunflowerIcon mood={holding ? 'holding' : paused ? 'sleepy' : 'awake'} size={92} className="w-full block" />
       </div>
 
       <div className={`text-[12px] font-bold text-center max-w-[220px] leading-relaxed transition-colors ${hintColor}`}>
