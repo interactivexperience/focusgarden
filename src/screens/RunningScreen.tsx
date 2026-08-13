@@ -16,13 +16,19 @@ export function RunningScreen() {
   const [holdAttempts, setHoldAttempts] = useState(0)
   const holdStartRef = useRef(0)
   const holdTimerRef = useRef<number | null>(null)
+  // Synchronous guard: pointerup AND pointerleave can both fire for one tap
+  // (e.g. hit-test jitter on touch), so React state (which batches/re-renders
+  // asynchronously) can't reliably prevent endHold() from running twice.
+  const holdActiveRef = useRef(false)
 
   function startHold() {
-    if (stopped) return
+    if (stopped || holdActiveRef.current) return
+    holdActiveRef.current = true
     holdStartRef.current = Date.now()
     setHolding(true)
     setHoldAttempts((n) => n + 1)
     holdTimerRef.current = window.setTimeout(() => {
+      holdActiveRef.current = false
       setHolding(false)
       setStopped(true)
       window.setTimeout(() => {
@@ -33,6 +39,8 @@ export function RunningScreen() {
   }
 
   function endHold() {
+    if (!holdActiveRef.current) return
+    holdActiveRef.current = false
     if (holdTimerRef.current) {
       window.clearTimeout(holdTimerRef.current)
       holdTimerRef.current = null
@@ -42,6 +50,16 @@ export function RunningScreen() {
     if (elapsed < HOLD_MS && !stopped) {
       togglePause()
     }
+  }
+
+  function cancelHold() {
+    if (!holdActiveRef.current) return
+    holdActiveRef.current = false
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current)
+      holdTimerRef.current = null
+    }
+    setHolding(false)
   }
 
   const paused = state.sessionPaused
@@ -55,6 +73,7 @@ export function RunningScreen() {
       onPointerDown={startHold}
       onPointerUp={endHold}
       onPointerLeave={endHold}
+      onPointerCancel={cancelHold}
     >
       <div className={`font-display font-extrabold text-[64px] sm:text-[76px] leading-none transition-colors ${timeColor}`}>
         {formatTime(state.remainingSeconds)}

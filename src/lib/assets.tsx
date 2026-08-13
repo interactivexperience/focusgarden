@@ -140,7 +140,7 @@ export function SunflowerIcon({
       alt=""
       draggable={false}
       className={className}
-      style={{ display: 'block', width: size, height: size }}
+      style={{ display: 'block', objectFit: 'contain', width: size, height: size }}
     />
   )
 }
