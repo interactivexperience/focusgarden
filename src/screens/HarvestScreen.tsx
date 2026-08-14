@@ -1,44 +1,48 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppIcon, FruitIcon } from '../lib/assets'
-import { FRUIT_KEYS, FRUIT_NAMES, randomFruitType } from '../lib/fruits'
+import type { FruitType } from '../lib/fruits'
+import { FRUIT_NAMES } from '../lib/fruits'
 import { playChime } from '../lib/sound'
 import { useFocusGarden } from '../state/store'
 
 interface FallItem {
   key: string
-  type: ReturnType<typeof randomFruitType>
+  type: FruitType
   size: number
   left: number
   duration: number
-  delay: number
   swayPx: number
   rot: number
-  restGap: number
+  landTop: number
 }
 
-function buildFallItems(): FallItem[] {
-  const count = 11
-  return Array.from({ length: count }, (_, i) => ({
-    key: `${Date.now()}-${i}`,
-    type: FRUIT_KEYS[Math.floor(Math.random() * FRUIT_KEYS.length)],
-    size: Math.round(28 + Math.random() * 20),
-    left: 4 + Math.random() * 88,
-    duration: 2.2 + Math.random() * 1.4,
-    delay: Math.random() * 0.9,
-    swayPx: Math.round((Math.random() > 0.5 ? 1 : -1) * (20 + Math.random() * 36)),
-    rot: Math.round((Math.random() > 0.5 ? 1 : -1) * (200 + Math.random() * 220)),
-    restGap: Math.round(4 + Math.random() * 14),
-  }))
+/** Genau die eine tatsächlich geerntete Sorte fällt – kein Sortiment aus Zufalls-Deko. */
+function buildFallItem(type: FruitType): FallItem {
+  return {
+    key: `${Date.now()}`,
+    type,
+    size: 92,
+    left: 50 + (Math.random() * 10 - 5),
+    duration: 1.9,
+    swayPx: Math.round((Math.random() > 0.5 ? 1 : -1) * (14 + Math.random() * 18)),
+    rot: Math.round((Math.random() > 0.5 ? 1 : -1) * (140 + Math.random() * 100)),
+    // Landet in der leeren Bildschirmmitte (Prozentwert, kein px-Offset vom
+    // unteren Rand) – dort überlappt es nicht mit "Weiter" / "Animation
+    // erneut abspielen" und bleibt über alle Bildschirmgrößen hinweg stabil.
+    landTop: 56 + Math.random() * 4,
+  }
 }
 
 export function HarvestScreen() {
   const { state, replayHarvest, ackHarvest } = useFocusGarden()
-  const [items, setItems] = useState<FallItem[]>([])
+  const [item, setItem] = useState<FallItem | null>(null)
 
   useEffect(() => {
-    const id = window.setTimeout(() => setItems(buildFallItems()), 60)
+    if (!state.lastHarvestType) return
+    const type = state.lastHarvestType
+    const id = window.setTimeout(() => setItem(buildFallItem(type)), 60)
     return () => window.clearTimeout(id)
-  }, [state.harvestReplayTick])
+  }, [state.harvestReplayTick, state.lastHarvestType])
 
   useEffect(() => {
     if (!state.soundState.focusEnd) return
@@ -46,20 +50,15 @@ export function HarvestScreen() {
     return () => window.clearTimeout(id)
   }, [state.harvestReplayTick, state.soundState.focusEnd])
 
-  const keyframes = useMemo(
-    () =>
-      items
-        .map(
-          (it) => `@keyframes fall-${it.key} {
-        0% { top: -16%; transform: translateX(0) rotate(0deg); opacity: 0; }
-        8% { opacity: 1; }
-        45% { top: 42%; transform: translateX(${Math.round(it.swayPx * 0.5)}px) rotate(${Math.round(it.rot * 0.4)}deg); }
-        100% { top: calc(100% - ${it.size}px - ${it.restGap}px); transform: translateX(${it.swayPx}px) rotate(${it.rot}deg); opacity: 1; }
-      }`,
-        )
-        .join('\n'),
-    [items],
-  )
+  const keyframes = useMemo(() => {
+    if (!item) return ''
+    return `@keyframes fall-${item.key} {
+      0% { top: -16%; transform: translateX(0) rotate(0deg) scale(0.8); opacity: 0; }
+      8% { opacity: 1; }
+      55% { top: 38%; transform: translateX(${Math.round(item.swayPx * 0.5)}px) rotate(${Math.round(item.rot * 0.4)}deg) scale(1.05); }
+      100% { top: ${item.landTop}%; transform: translateX(${item.swayPx}px) rotate(${item.rot}deg) scale(1); opacity: 1; }
+    }`
+  }, [item])
 
   const minutesFocused = Math.round(state.totalSeconds / 60)
 
@@ -68,21 +67,21 @@ export function HarvestScreen() {
       <style dangerouslySetInnerHTML={{ __html: keyframes }} />
 
       <div className="absolute inset-0 pointer-events-none z-0">
-        {items.map((it) => (
+        {item && (
           <div
-            key={it.key}
+            key={item.key}
             className="absolute opacity-0"
             style={{
-              left: `${it.left}%`,
-              width: it.size,
-              height: it.size,
-              filter: 'drop-shadow(0 4px 4px rgba(0,0,0,0.15))',
-              animation: `fall-${it.key} ${it.duration}s ${it.delay}s cubic-bezier(.4,.1,.6,1) forwards`,
+              left: `${item.left}%`,
+              width: item.size,
+              height: item.size,
+              filter: 'drop-shadow(0 6px 6px rgba(0,0,0,0.18))',
+              animation: `fall-${item.key} ${item.duration}s cubic-bezier(.4,.1,.6,1) forwards`,
             }}
           >
-            <FruitIcon type={it.type} size={it.size} />
+            <FruitIcon type={item.type} size={item.size} />
           </div>
-        ))}
+        )}
       </div>
 
       {state.lastHarvestType && (

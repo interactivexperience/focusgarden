@@ -98,22 +98,29 @@ export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
       targetGravityRef.current = { x: Math.max(-1, Math.min(1, gamma / 32)), y: 1 }
     }
 
-    function enableTilt() {
-      const DOE = window.DeviceOrientationEvent as
-        | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<'granted' | 'denied'> })
-        | undefined
-      if (DOE && typeof DOE.requestPermission === 'function') {
-        DOE.requestPermission()
-          .then((state) => {
-            if (state === 'granted') window.addEventListener('deviceorientation', onOrientation)
-          })
-          .catch(() => {})
-      } else if (window.DeviceOrientationEvent) {
-        window.addEventListener('deviceorientation', onOrientation)
-      }
+    const DOE = window.DeviceOrientationEvent as
+      | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<'granted' | 'denied'> })
+      | undefined
+    const needsPermission = !!DOE && typeof DOE.requestPermission === 'function'
+
+    function requestTiltPermission() {
+      DOE!.requestPermission!()
+        .then((state) => {
+          if (state === 'granted') window.addEventListener('deviceorientation', onOrientation)
+        })
+        .catch(() => {})
     }
+
     const parent = canvas.parentElement
-    parent?.addEventListener('click', enableTilt, { once: true })
+    if (needsPermission) {
+      // iOS verlangt zwingend eine Nutzergeste für requestPermission() – kann
+      // nicht vorab ohne Tap erteilt werden.
+      parent?.addEventListener('click', requestTiltPermission, { once: true })
+    } else if (window.DeviceOrientationEvent) {
+      // Android/Desktop mit Sensoren brauchen keine Erlaubnis – sofort lauschen,
+      // statt unnötig auf einen ersten Tap zu warten.
+      window.addEventListener('deviceorientation', onOrientation)
+    }
 
     function onPointerMove(e: PointerEvent) {
       const rect = canvas!.getBoundingClientRect()
@@ -202,7 +209,7 @@ export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
       cancelAnimationFrame(rafId)
       window.removeEventListener('resize', sizeCanvas)
       window.removeEventListener('deviceorientation', onOrientation)
-      parent?.removeEventListener('click', enableTilt)
+      parent?.removeEventListener('click', requestTiltPermission)
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerleave', onPointerLeave)
     }
