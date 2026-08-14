@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { FruitIcon } from '../lib/assets'
 import { AppIcon } from '../lib/assets'
-import { CUSTOM_MAX_MINUTES, CUSTOM_MIN_MINUTES, CUSTOM_STEP_MINUTES, TIME_PRESETS } from '../lib/presets'
+import { InfoIcon } from '../lib/decor-icons'
+import { CUSTOM_MAX_MINUTES, CUSTOM_MIN_MINUTES, CUSTOM_STEP_MINUTES, TIME_PRESETS, type TimePreset } from '../lib/presets'
 import { useFocusGarden } from '../state/store'
 
 export function TimeSheet() {
   const { state, navigate, selectPreset, stepMinutes, applyTime } = useFocusGarden()
+  const [infoPreset, setInfoPreset] = useState<TimePreset | null>(null)
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -32,11 +35,15 @@ export function TimeSheet() {
           {TIME_PRESETS.map((preset) => {
             const selected = state.selectedPresetName === preset.name
             return (
-              <button
+              <div
                 key={preset.name}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => selectPreset(preset.minutes, preset.name)}
-                className={`flex items-center gap-3.5 rounded-2xl px-3.5 py-3 border-[1.5px] text-left shadow-[0_4px_14px_rgba(61,58,52,0.07)] transition-all duration-150 active:scale-[0.97] ${
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') selectPreset(preset.minutes, preset.name)
+                }}
+                className={`flex items-center gap-3.5 rounded-2xl px-3.5 py-3 border-[1.5px] text-left shadow-[0_4px_14px_rgba(61,58,52,0.07)] transition-all duration-150 active:scale-[0.97] cursor-pointer ${
                   selected ? 'border-leaf bg-leaf-pale' : 'border-transparent bg-white'
                 }`}
               >
@@ -60,6 +67,17 @@ export function TimeSheet() {
                     {preset.minutes} Min Fokus · {preset.breakMinutes} Min Pause
                   </div>
                 </div>
+                <button
+                  type="button"
+                  aria-label={`Mehr zu ${preset.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setInfoPreset(preset)
+                  }}
+                  className="flex-shrink-0 p-1.5 -m-1.5 active:scale-90 active:opacity-60 transition-all duration-150"
+                >
+                  <InfoIcon size={17} color={selected ? '#4C8A52' : '#B3AC9E'} />
+                </button>
                 <div
                   className={`w-[19px] h-[19px] rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
                     selected ? 'border-leaf' : 'border-[#DCD6C8]'
@@ -67,7 +85,7 @@ export function TimeSheet() {
                 >
                   {selected && <div className="w-2.5 h-2.5 rounded-full bg-leaf" />}
                 </div>
-              </button>
+              </div>
             )
           })}
         </div>
@@ -108,6 +126,39 @@ export function TimeSheet() {
           Übernehmen
         </button>
       </div>
+
+      {infoPreset && (
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+          <button
+            type="button"
+            aria-label="Schließen"
+            onClick={() => setInfoPreset(null)}
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+          />
+          <div className="relative bg-white/95 backdrop-blur-2xl rounded-t-[32px] p-6 pb-[max(1.75rem,env(safe-area-inset-bottom))] animate-[sheetIn_0.28s_cubic-bezier(0.22,1,0.36,1)]">
+            <div className="w-9 h-1 bg-line rounded-full mx-auto mb-5" />
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 rounded-2xl bg-leaf-pale flex items-center justify-center flex-shrink-0">
+                <FruitIcon type={infoPreset.icon} size={30} />
+              </div>
+              <div>
+                <div className="font-display text-[17px] font-bold">{infoPreset.name}</div>
+                <div className="text-[11px] text-ink-soft font-semibold">
+                  {infoPreset.minutes} Min Fokus · {infoPreset.breakMinutes} Min Pause
+                </div>
+              </div>
+            </div>
+            <p className="text-[13px] text-ink leading-relaxed mb-5">{infoPreset.description}</p>
+            <button
+              type="button"
+              onClick={() => setInfoPreset(null)}
+              className="w-full justify-center bg-leaf text-white font-bold text-[14px] py-3.5 rounded-full active:scale-[0.97] transition-transform"
+            >
+              Verstanden
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

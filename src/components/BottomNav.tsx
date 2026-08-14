@@ -5,7 +5,7 @@ const NAV_ITEMS: { screen: Screen; label: string; icon: IconName }[] = [
   { screen: 'start', label: 'Start', icon: 'leaf' },
   { screen: 'today', label: 'Heute', icon: 'calendar' },
   { screen: 'varieties', label: 'Sorten', icon: 'trophy' },
-  { screen: 'settings', label: 'Einstellungen', icon: 'settings' },
+  { screen: 'settings', label: 'Sound', icon: 'settings' },
 ]
 
 export function BottomNav({ active, onNavigate }: { active: Screen; onNavigate: (s: Screen) => void }) {
@@ -19,7 +19,7 @@ export function BottomNav({ active, onNavigate }: { active: Screen; onNavigate: 
               key={item.screen}
               type="button"
               onClick={() => onNavigate(item.screen)}
-              className="flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-full transition-all duration-200 ease-out active:scale-90"
+              className="flex flex-col items-center gap-0.5 w-16 py-1.5 rounded-full transition-all duration-200 ease-out active:scale-90"
               style={{ background: isActive ? 'var(--color-leaf-pale)' : 'transparent' }}
             >
               <AppIcon name={item.icon} size={19} className={isActive ? 'opacity-100' : 'opacity-45'} />

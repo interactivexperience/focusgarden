@@ -94,8 +94,18 @@ export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
     window.addEventListener('resize', sizeCanvas)
 
     function onOrientation(e: DeviceOrientationEvent) {
-      const gamma = e.gamma || 0
-      targetGravityRef.current = { x: Math.max(-1, Math.min(1, gamma / 32)), y: 1 }
+      // gamma: Links-Rechts-Neigung (Roll) -> horizontale Schwerkraft.
+      const gamma = e.gamma ?? 0
+      const x = Math.max(-1, Math.min(1, gamma / 32))
+      // beta: Vor-Zurück-Neigung (Pitch). 90° = aufrecht in der Hand (Referenz-
+      // haltung), Formel gibt dort +1 (voll runter). Kippt man das Handy nach
+      // hinten, sinkt beta Richtung 0 und die Y-Schwerkraft schwächt sich ab;
+      // dreht man es weiter bis auf den Kopf (beta Richtung 270/-90), wird der
+      // Wert negativ – die Sorten fallen dann Richtung Bildschirm-Oberkante,
+      // nicht nur seitwärts wie zuvor.
+      const beta = e.beta ?? 90
+      const y = Math.cos(((beta - 90) * Math.PI) / 180)
+      targetGravityRef.current = { x, y }
     }
 
     const DOE = window.DeviceOrientationEvent as
@@ -123,9 +133,16 @@ export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
     }
 
     function onPointerMove(e: PointerEvent) {
+      // Maus-Fallback fürs Desktop-Testen: horizontale Position simuliert
+      // Links-Rechts-Neigung, vertikale Position simuliert Vor-Zurück-Neigung
+      // (oben im Canvas = nach hinten gekippt, unten = nach vorn/kopfüber).
       const rect = canvas!.getBoundingClientRect()
       const relX = (e.clientX - rect.left - rect.width / 2) / (rect.width / 2)
-      targetGravityRef.current = { x: Math.max(-1, Math.min(1, relX)), y: 1 }
+      const relY = (e.clientY - rect.top - rect.height / 2) / (rect.height / 2)
+      targetGravityRef.current = {
+        x: Math.max(-1, Math.min(1, relX)),
+        y: Math.max(-1, Math.min(1, relY)),
+      }
     }
     function onPointerLeave() {
       targetGravityRef.current = { x: 0, y: 1 }

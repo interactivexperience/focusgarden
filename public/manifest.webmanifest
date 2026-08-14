@@ -1,0 +1,17 @@
+{
+  "name": "Fokusgarten",
+  "short_name": "Fokusgarten",
+  "description": "Kawaii-Pomodoro-App mit Sammelmechanik",
+  "start_url": "/focusgarden/",
+  "scope": "/focusgarden/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EAF4E4",
+  "theme_color": "#EAF4E4",
+  "lang": "de",
+  "icons": [
+    { "src": "/focusgarden/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/focusgarden/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/focusgarden/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -28,6 +28,16 @@ export function BasketIcon({ size = 13, color = '#4C8A52' }: { size?: number; co
   )
 }
 
+export function InfoIcon({ size = 15, color = '#8A8172' }: { size?: number; color?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" aria-hidden="true">
+      <circle cx={12} cy={12} r={9.5} stroke={color} strokeWidth={1.8} />
+      <circle cx={12} cy={7.8} r={1.15} fill={color} />
+      <path d="M12 11v6" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function LockIcon({ size = 12, color = '#8A8172' }: { size?: number; color?: string }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" aria-hidden="true">
