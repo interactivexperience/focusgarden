@@ -11,6 +11,16 @@ interface Particle {
   r: number
 }
 
+/**
+ * Bewusst außerhalb der Komponente (Modul-Ebene statt useRef): StartScreen –
+ * und damit SandCanvas – wird bei jedem Verlassen von "start" (Fokus läuft,
+ * Ernte) komplett unmountet und beim Zurückkehren neu gemountet. Mit einem
+ * useRef würden dabei alle Partikel-Positionen verloren gehen, wodurch JEDE
+ * bereits erarbeitete Sorte erneut von oben hereinfällt – nicht nur die neu
+ * hinzugekommene. Als Modul-Variable überlebt der Zustand den Remount.
+ */
+let sharedParticles: Particle[] = []
+
 const FRUIT_COLOR: Partial<Record<FruitType, string>> = {
   tomato: '#FF6B5C',
   strawberry: '#FF7F93',
@@ -40,16 +50,21 @@ const FRUIT_COLOR: Partial<Record<FruitType, string>> = {
  */
 export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const particlesRef = useRef<Particle[]>([])
   const imgCacheRef = useRef<Record<string, HTMLImageElement>>({})
   const sizeRef = useRef({ w: 0, h: 0 })
   const gravityRef = useRef({ x: 0, y: 1 })
   const targetGravityRef = useRef({ x: 0, y: 1 })
 
   useEffect(() => {
-    while (particlesRef.current.length < fruitTypes.length) {
-      const type = fruitTypes[particlesRef.current.length]
-      particlesRef.current.push({
+    // Tageswechsel (todaysHarvest wurde zurückgesetzt) oder erster echter
+    // Seitenaufruf mit weniger Einträgen als zuvor gespeichert: komplett neu
+    // aufbauen, statt überzählige alte Partikel stehen zu lassen.
+    if (fruitTypes.length < sharedParticles.length) {
+      sharedParticles = []
+    }
+    while (sharedParticles.length < fruitTypes.length) {
+      const type = fruitTypes[sharedParticles.length]
+      sharedParticles.push({
         type,
         x: sizeRef.current.w / 2 + (Math.random() * 40 - 20),
         y: -20 - Math.random() * 30,
@@ -158,7 +173,7 @@ export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
       gravity.x += (target.x - gravity.x) * 0.06
       gravity.y += (target.y - gravity.y) * 0.06
 
-      const particles = particlesRef.current
+      const particles = sharedParticles
       particles.forEach((p) => {
         p.vx += gravity.x * 0.3
         p.vy += gravity.y * 0.3

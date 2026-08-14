@@ -54,22 +54,6 @@ body {
   }
 }
 
-@keyframes sproutBounce {
-  0%,
-  100% {
-    transform: scale(1, 1) translateY(0);
-  }
-  30% {
-    transform: scale(1.06, 0.94) translateY(2px);
-  }
-  55% {
-    transform: scale(0.93, 1.09) translateY(-7px);
-  }
-  80% {
-    transform: scale(1.02, 0.98) translateY(0);
-  }
-}
-
 @keyframes holdBarFill {
   from {
     width: 0%;

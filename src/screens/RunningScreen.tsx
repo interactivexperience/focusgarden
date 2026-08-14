@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { SunflowerIcon } from '../lib/assets'
+import { useEffect, useRef, useState } from 'react'
+import { SunflowerIcon, type SunflowerMood } from '../lib/assets'
 import { formatTime } from '../lib/presets'
 import { useFocusGarden } from '../state/store'
 
@@ -8,12 +8,15 @@ const IDLE_HINT = 'Bildschirm antippen zum Pausieren · Lang halten zum Beenden'
 const PAUSE_HINT = 'Pausiert – zum Fortsetzen tippen'
 /** Je öfter innerhalb einer Sitzung gehalten wird, desto genervter schaut die Sonnenblume. */
 const HOLD_MOOD_CYCLE = ['shock', 'sad', 'wink'] as const
+/** Während des ruhigen Fokus-Zustands wechselt die Mimik nur gelegentlich, nie hüpfend. */
+const IDLE_MOODS: SunflowerMood[] = ['happy', 'heart', 'wink', 'laugh', 'neutral']
 
 export function RunningScreen() {
   const { state, togglePause, resetAfterStop } = useFocusGarden()
   const [holding, setHolding] = useState(false)
   const [stopped, setStopped] = useState(false)
   const [holdAttempts, setHoldAttempts] = useState(0)
+  const [idleMood, setIdleMood] = useState<SunflowerMood>('happy')
   const holdStartRef = useRef(0)
   const holdTimerRef = useRef<number | null>(null)
   // Synchronous guard: pointerup AND pointerleave can both fire for one tap
@@ -63,6 +66,18 @@ export function RunningScreen() {
   }
 
   const paused = state.sessionPaused
+
+  // Gelegentlicher, unregelmäßiger Mimik-Wechsel während der Fokus ruhig
+  // läuft – kein Countdown, damit es sich nicht mechanisch anfühlt.
+  useEffect(() => {
+    if (paused || holding || stopped) return
+    const delay = 20_000 + Math.random() * 25_000
+    const id = window.setTimeout(() => {
+      const options = IDLE_MOODS.filter((m) => m !== idleMood)
+      setIdleMood(options[Math.floor(Math.random() * options.length)])
+    }, delay)
+    return () => window.clearTimeout(id)
+  }, [paused, holding, stopped, idleMood])
   const hint = stopped ? '' : holding ? 'Halten zum Beenden …' : paused ? PAUSE_HINT : IDLE_HINT
   const timeColor = holding ? 'text-stop' : paused ? 'text-ink-faint' : 'text-ink'
   const hintColor = holding ? 'text-stop' : paused ? 'text-leaf-dark' : 'text-ink-soft'
@@ -91,17 +106,11 @@ export function RunningScreen() {
         />
       </div>
 
-      <div
-        className="w-[92px] origin-bottom"
-        style={{
-          animation: 'sproutBounce 2.4s cubic-bezier(.34,1.2,.64,1) infinite',
-          animationPlayState: paused ? 'paused' : 'running',
-        }}
-      >
+      <div className="w-[92px]">
         <SunflowerIcon
-          mood={holding ? HOLD_MOOD_CYCLE[(holdAttempts - 1) % HOLD_MOOD_CYCLE.length] : paused ? 'tired' : 'happy'}
+          mood={holding ? HOLD_MOOD_CYCLE[(holdAttempts - 1) % HOLD_MOOD_CYCLE.length] : paused ? 'tired' : idleMood}
           size={92}
-          className="w-full block"
+          className="w-full block transition-opacity duration-500"
         />
       </div>
 
