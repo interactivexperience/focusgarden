@@ -32,8 +32,8 @@ function VarietyGroup({
                   <LockIcon />
                 </div>
               )}
-              <div className={locked ? 'grayscale opacity-40' : ''}>
-                <FruitIcon type={type} size={52} className="mx-auto" />
+              <div className={locked ? 'opacity-45' : ''}>
+                <FruitIcon type={type} size={52} className="mx-auto" silhouette={locked} />
               </div>
               <div className={`text-[9.5px] font-bold mt-0.5 ${locked ? 'text-ink-faint' : 'text-ink'}`}>
                 {locked ? '???' : FRUIT_NAMES[type]}

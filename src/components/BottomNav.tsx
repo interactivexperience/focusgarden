@@ -10,27 +10,29 @@ const NAV_ITEMS: { screen: Screen; label: string; icon: IconName }[] = [
 
 export function BottomNav({ active, onNavigate }: { active: Screen; onNavigate: (s: Screen) => void }) {
   return (
-    <nav className="flex items-center justify-around bg-white border-t border-line px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-      {NAV_ITEMS.map((item) => {
-        const isActive = item.screen === active
-        return (
-          <button
-            key={item.screen}
-            type="button"
-            onClick={() => onNavigate(item.screen)}
-            className="flex flex-col items-center gap-1 px-4 py-1.5 rounded-2xl transition-colors"
-            style={{ background: isActive ? 'var(--color-leaf-pale)' : 'transparent' }}
-          >
-            <AppIcon name={item.icon} size={20} className={isActive ? 'opacity-100' : 'opacity-45'} />
-            <span
-              className="text-[10px] font-bold"
-              style={{ color: isActive ? 'var(--color-leaf-dark)' : 'var(--color-ink-faint)' }}
+    <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center pointer-events-none px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <nav className="pointer-events-auto flex items-center gap-1 px-2 py-2 rounded-[26px] bg-white/70 backdrop-blur-xl backdrop-saturate-150 border border-white/60 shadow-[0_10px_30px_rgba(61,58,52,0.18),0_1px_1px_rgba(61,58,52,0.06)]">
+        {NAV_ITEMS.map((item) => {
+          const isActive = item.screen === active
+          return (
+            <button
+              key={item.screen}
+              type="button"
+              onClick={() => onNavigate(item.screen)}
+              className="flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-full transition-all duration-200 ease-out active:scale-90"
+              style={{ background: isActive ? 'var(--color-leaf-pale)' : 'transparent' }}
             >
-              {item.label}
-            </span>
-          </button>
-        )
-      })}
-    </nav>
+              <AppIcon name={item.icon} size={19} className={isActive ? 'opacity-100' : 'opacity-45'} />
+              <span
+                className="text-[9.5px] font-bold transition-colors duration-200"
+                style={{ color: isActive ? 'var(--color-leaf-dark)' : 'var(--color-ink-faint)' }}
+              >
+                {item.label}
+              </span>
+            </button>
+          )
+        })}
+      </nav>
+    </div>
   )
 }

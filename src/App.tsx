@@ -17,7 +17,7 @@ function AppShell() {
 
   return (
     <div className="flex flex-col h-dvh bg-bg-app mx-auto max-w-[480px]">
-      <div className="flex-1 flex flex-col relative overflow-hidden">
+      <div className={`flex-1 flex flex-col relative overflow-hidden ${showNav ? 'pb-20' : ''}`}>
         {(state.screen === 'start' || state.screen === 'timeSheet') && <StartScreen />}
         {state.screen === 'timeSheet' && <TimeSheet />}
         {state.screen === 'running' && <RunningScreen />}
@@ -26,8 +26,8 @@ function AppShell() {
         {state.screen === 'varieties' && <VarietiesScreen />}
         {state.screen === 'settings' && <SettingsScreen onOpenWidgetPreview={() => navigate('widget')} />}
         {state.screen === 'widget' && <WidgetPreviewScreen onBack={() => navigate('settings')} />}
+        {showNav && <BottomNav active={state.screen} onNavigate={navigate} />}
       </div>
-      {showNav && <BottomNav active={state.screen} onNavigate={navigate} />}
     </div>
   )
 }

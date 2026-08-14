@@ -30,6 +30,11 @@ interface State {
   /** Kalendertag (lokal), auf den sich `todaysHarvest` gerade bezieht – erlaubt einen
    *  Tageswechsel zu erkennen, während die App offen bleibt (kein Reload über Mitternacht). */
   activeDayKey: string
+  /** Timestamp (ms), zu dem die laufende Sitzung endet – während einer Pause null.
+   *  Die Restzeit wird daraus neu berechnet statt hochzuzählen, damit gedrosselte
+   *  oder pausierte Timer (Bildschirm aus, Tab im Hintergrund) beim Zurückkehren
+   *  sofort wieder den korrekten Stand zeigen, statt Zeit "verloren" zu haben. */
+  sessionEndAt: number | null
   harvestReplayTick: number
 }
 
@@ -55,6 +60,7 @@ function initState(): State {
       streak: 0,
       lastHarvestDate: '',
       activeDayKey: today,
+      sessionEndAt: null,
       harvestReplayTick: 0,
     }
   }
@@ -80,6 +86,7 @@ function initState(): State {
     streak,
     lastHarvestDate,
     activeDayKey: today,
+    sessionEndAt: null,
     harvestReplayTick: 0,
   }
 }
@@ -90,7 +97,7 @@ type Action =
   | { type: 'STEP_MINUTES'; delta: number }
   | { type: 'APPLY_TIME' }
   | { type: 'START_SESSION' }
-  | { type: 'TICK' }
+  | { type: 'SYNC_TIME' }
   | { type: 'CHECK_DAY_ROLLOVER' }
   | { type: 'TOGGLE_PAUSE' }
   | { type: 'RESET_AFTER_STOP' }
@@ -124,11 +131,17 @@ function reducer(state: State, action: Action): State {
     }
 
     case 'START_SESSION':
-      return { ...state, remainingSeconds: state.totalSeconds, sessionPaused: false, screen: 'running' }
+      return {
+        ...state,
+        remainingSeconds: state.totalSeconds,
+        sessionEndAt: Date.now() + state.totalSeconds * 1000,
+        sessionPaused: false,
+        screen: 'running',
+      }
 
-    case 'TICK': {
-      if (state.sessionPaused || state.screen !== 'running') return state
-      const remaining = state.remainingSeconds - 1
+    case 'SYNC_TIME': {
+      if (state.sessionPaused || state.screen !== 'running' || state.sessionEndAt === null) return state
+      const remaining = Math.max(0, Math.round((state.sessionEndAt - Date.now()) / 1000))
       if (remaining > 0) return { ...state, remainingSeconds: remaining }
 
       const type = randomFruitType()
@@ -145,6 +158,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         remainingSeconds: state.totalSeconds,
+        sessionEndAt: null,
         sessionPaused: false,
         screen: 'harvest',
         todaysHarvest,
@@ -168,11 +182,22 @@ function reducer(state: State, action: Action): State {
       }
     }
 
-    case 'TOGGLE_PAUSE':
-      return { ...state, sessionPaused: !state.sessionPaused }
+    case 'TOGGLE_PAUSE': {
+      if (state.sessionPaused) {
+        // Fortsetzen: neuen Ziel-Zeitpunkt aus der eingefrorenen Restzeit berechnen.
+        return { ...state, sessionPaused: false, sessionEndAt: Date.now() + state.remainingSeconds * 1000 }
+      }
+      // Pausieren: Restzeit frisch aus sessionEndAt einfrieren, nicht den evtl.
+      // veralteten (seit dem letzten SYNC_TIME) remainingSeconds-Wert übernehmen.
+      const remaining =
+        state.sessionEndAt !== null
+          ? Math.max(0, Math.round((state.sessionEndAt - Date.now()) / 1000))
+          : state.remainingSeconds
+      return { ...state, sessionPaused: true, sessionEndAt: null, remainingSeconds: remaining }
+    }
 
     case 'RESET_AFTER_STOP':
-      return { ...state, remainingSeconds: state.totalSeconds, sessionPaused: false, screen: 'start' }
+      return { ...state, remainingSeconds: state.totalSeconds, sessionEndAt: null, sessionPaused: false, screen: 'start' }
 
     case 'REPLAY_HARVEST':
       return { ...state, harvestReplayTick: state.harvestReplayTick + 1 }
@@ -209,14 +234,64 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state)
   stateRef.current = state
 
+  // Zählt nicht hoch, sondern berechnet die Restzeit bei jedem Tick aus
+  // sessionEndAt neu – auch wenn setInterval gedrosselt wird (Tab im
+  // Hintergrund, Bildschirm aus) und seltener als jede Sekunde feuert, zeigt
+  // die App beim nächsten Tick sofort wieder die korrekte, real verstrichene
+  // Zeit statt "verlorener" Sekunden.
   useEffect(() => {
-    const id = window.setInterval(() => {
+    const sync = () => {
       if (stateRef.current.screen === 'running' && !stateRef.current.sessionPaused) {
-        dispatch({ type: 'TICK' })
+        dispatch({ type: 'SYNC_TIME' })
       }
-    }, 1000)
-    return () => window.clearInterval(id)
+    }
+    const id = window.setInterval(sync, 1000)
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', sync)
+    }
   }, [])
+
+  // Screen Wake Lock: verhindert best-effort, dass der Bildschirm während
+  // einer laufenden (nicht pausierten) Fokuszeit einschläft. Wird von manchen
+  // Browsern nicht unterstützt oder kann fehlschlagen (z.B. Energiesparmodus) –
+  // die Zeitmessung bleibt dank sessionEndAt auch dann korrekt.
+  useEffect(() => {
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> }
+    }
+    if (!nav.wakeLock) return
+
+    let sentinel: { release: () => Promise<void> } | null = null
+    let cancelled = false
+    const shouldHold = state.screen === 'running' && !state.sessionPaused
+
+    async function acquire() {
+      try {
+        const lock = await nav.wakeLock!.request('screen')
+        if (cancelled) {
+          void lock.release()
+          return
+        }
+        sentinel = lock
+      } catch {
+        // Ignorieren – z.B. Energiesparmodus oder Tab nicht sichtbar.
+      }
+    }
+    function onVisibility() {
+      if (shouldHold && document.visibilityState === 'visible' && !sentinel) void acquire()
+    }
+
+    if (shouldHold) void acquire()
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisibility)
+      if (sentinel) void sentinel.release()
+    }
+  }, [state.screen, state.sessionPaused])
 
   // Erkennt einen Tageswechsel, während die App offen bleibt (kein Reload über
   // Mitternacht hinweg) und setzt dann todaysHarvest/Streak zurück. 30s reicht,

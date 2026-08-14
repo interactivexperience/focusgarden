@@ -85,7 +85,7 @@ export function HarvestScreen() {
       </div>
 
       {state.lastHarvestType && (
-        <div className="relative z-10 self-center bg-white rounded-full px-4.5 py-2 flex items-center gap-2 shadow-[0_16px_36px_rgba(61,58,52,0.14)] text-[12.5px] font-bold mt-1">
+        <div className="relative z-10 self-center bg-white/75 backdrop-blur-xl backdrop-saturate-150 border border-white/60 rounded-full px-4.5 py-2 flex items-center gap-2 shadow-[0_16px_36px_rgba(61,58,52,0.14)] text-[12.5px] font-bold mt-1">
           <FruitIcon type={state.lastHarvestType} size={22} />
           <span>
             {FRUIT_NAMES[state.lastHarvestType]} geerntet · {minutesFocused} Min Fokus!
@@ -93,7 +93,7 @@ export function HarvestScreen() {
         </div>
       )}
 
-      <div className="absolute top-8 right-5 z-10 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-[0_4px_14px_rgba(61,58,52,0.07)]">
+      <div className="absolute top-8 right-5 z-10 w-8 h-8 rounded-full bg-white/75 backdrop-blur-xl backdrop-saturate-150 border border-white/60 flex items-center justify-center shadow-[0_4px_14px_rgba(61,58,52,0.07)]">
         <AppIcon name={state.soundState.focusEnd ? 'sound-on' : 'sound-off'} size={16} />
       </div>
 
@@ -108,7 +108,7 @@ export function HarvestScreen() {
         <button
           type="button"
           onClick={replayHarvest}
-          className="text-[11.5px] font-bold text-leaf-dark underline underline-offset-4"
+          className="text-[11.5px] font-bold text-leaf-dark underline underline-offset-4 active:opacity-50 transition-opacity"
         >
           Animation erneut abspielen
         </button>

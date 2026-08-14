@@ -29,7 +29,16 @@ export const SUNFLOWER_IMAGES = keyByFilename(sunflowerModules)
 export type IconName = keyof typeof ICON_IMAGES
 
 /** Mais-Vorlage war beim Export aus der EPS oben abgeschnitten – handgezeichneter Fallback im selben Sticker-Stil. */
-function CornIcon({ size = 64, className }: { size?: number; className?: string }) {
+function CornIcon({ size = 64, className, silhouette }: { size?: number; className?: string; silhouette?: boolean }) {
+  if (silhouette) {
+    return (
+      <svg viewBox="0 0 120 120" width={size} height={size} className={className} aria-hidden="true">
+        <rect x={34} y={10} width={52} height={100} rx={24} fill="var(--color-ink-faint)" />
+        <path d="M30 78 Q14 88 22 102 Q12 106 16 116 L34 110 Q26 100 32 90 Z" fill="var(--color-ink-faint)" />
+        <path d="M90 78 Q106 88 98 102 Q108 106 104 116 L86 110 Q94 100 88 90 Z" fill="var(--color-ink-faint)" />
+      </svg>
+    )
+  }
   const outline = { stroke: '#2B2118', strokeWidth: 6, style: { paintOrder: 'stroke' as const } }
   const outlineSm = { stroke: '#2B2118', strokeWidth: 4, style: { paintOrder: 'stroke' as const } }
   return (
@@ -70,15 +79,41 @@ export function FruitIcon({
   type,
   size = 64,
   className,
+  silhouette,
 }: {
   type: FruitType
   size?: number
   className?: string
+  /** Für noch nicht entdeckte Sorten: gefüllte Silhouette statt der echten
+   *  Illustration, damit die konkrete Sorte nicht erkennbar ist. */
+  silhouette?: boolean
 }) {
   const src = FRUIT_IMAGES[type]
   if (!src) {
     const Fallback = HAND_DRAWN_FALLBACKS[type]
-    return Fallback ? <Fallback size={size} className={className} /> : null
+    return Fallback ? <Fallback size={size} className={className} silhouette={silhouette} /> : null
+  }
+  if (silhouette) {
+    return (
+      <div
+        aria-hidden="true"
+        className={className}
+        style={{
+          display: 'block',
+          width: size,
+          height: size,
+          backgroundColor: 'var(--color-ink-faint)',
+          WebkitMaskImage: `url(${src})`,
+          maskImage: `url(${src})`,
+          WebkitMaskSize: 'contain',
+          maskSize: 'contain',
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+          WebkitMaskPosition: 'center',
+          maskPosition: 'center',
+        }}
+      />
+    )
   }
   return (
     <img

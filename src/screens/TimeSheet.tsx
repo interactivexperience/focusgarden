@@ -12,18 +12,19 @@ export function TimeSheet() {
         type="button"
         aria-label="Schließen"
         onClick={() => navigate('start')}
-        className="absolute inset-0 bg-black/20"
+        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
       />
-      <div className="relative bg-bg-app rounded-t-[32px] pt-3.5 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] max-h-[85vh] flex flex-col animate-[sheetIn_0.28s_cubic-bezier(0.22,1,0.36,1)]">
+      <div className="relative bg-bg-app/90 backdrop-blur-2xl backdrop-saturate-150 rounded-t-[32px] pt-3.5 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] max-h-[85vh] flex flex-col animate-[sheetIn_0.28s_cubic-bezier(0.22,1,0.36,1)]">
         <div className="w-9 h-1 bg-line rounded-full mx-auto mb-4.5" />
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display text-[19px] font-bold m-0">Fokuszeit wählen</h2>
           <button
             type="button"
             onClick={() => navigate('start')}
-            className="w-8 h-8 rounded-full bg-white border border-line flex items-center justify-center"
+            aria-label="Schließen"
+            className="flex items-center justify-center p-1.5 -m-1.5 active:scale-90 active:opacity-60 transition-all duration-150"
           >
-            <AppIcon name="close" size={14} />
+            <AppIcon name="close" size={22} />
           </button>
         </div>
 
@@ -35,7 +36,7 @@ export function TimeSheet() {
                 key={preset.name}
                 type="button"
                 onClick={() => selectPreset(preset.minutes, preset.name)}
-                className={`flex items-center gap-3.5 rounded-2xl px-3.5 py-3 border-[1.5px] text-left shadow-[0_4px_14px_rgba(61,58,52,0.07)] ${
+                className={`flex items-center gap-3.5 rounded-2xl px-3.5 py-3 border-[1.5px] text-left shadow-[0_4px_14px_rgba(61,58,52,0.07)] transition-all duration-150 active:scale-[0.97] ${
                   selected ? 'border-leaf bg-leaf-pale' : 'border-transparent bg-white'
                 }`}
               >
@@ -78,7 +79,7 @@ export function TimeSheet() {
               type="button"
               onClick={() => stepMinutes(-CUSTOM_STEP_MINUTES)}
               disabled={state.pendingMinutes <= CUSTOM_MIN_MINUTES}
-              className="w-9 h-9 rounded-full border-[1.5px] border-line bg-white text-[15px] text-ink disabled:opacity-30"
+              className="w-9 h-9 rounded-full border-[1.5px] border-line bg-white text-[15px] text-ink disabled:opacity-30 transition-transform duration-150 active:scale-90"
             >
               −
             </button>
@@ -92,7 +93,7 @@ export function TimeSheet() {
               type="button"
               onClick={() => stepMinutes(CUSTOM_STEP_MINUTES)}
               disabled={state.pendingMinutes >= CUSTOM_MAX_MINUTES}
-              className="w-9 h-9 rounded-full border-[1.5px] border-line bg-white text-[15px] text-ink disabled:opacity-30"
+              className="w-9 h-9 rounded-full border-[1.5px] border-line bg-white text-[15px] text-ink disabled:opacity-30 transition-transform duration-150 active:scale-90"
             >
               +
             </button>
