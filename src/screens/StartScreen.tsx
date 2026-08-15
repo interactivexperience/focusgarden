@@ -8,7 +8,7 @@ export function StartScreen() {
 
   return (
     <div className="relative flex-1 overflow-hidden">
-      <SandCanvas fruitTypes={state.todaysHarvest} />
+      <SandCanvas fruitTypes={state.todaysHarvest} hapticsEnabled={state.soundState.haptics} />
       {/* pointer-events-none: sonst blockiert dieser volle-Bildschirm-Wrapper
           (h-full, um seinen Inhalt zu zentrieren) den Sanduhr-Canvas darunter
           komplett für Maus-/Touch-Events, auch außerhalb der sichtbaren Buttons. */}

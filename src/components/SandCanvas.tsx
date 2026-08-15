@@ -43,17 +43,22 @@ const FRUIT_COLOR: Partial<Record<FruitType, string>> = {
   potato: '#C99A6B',
 }
 
+const HAPTIC_MIN_SPEED = 0.6
+const HAPTIC_THROTTLE_MS = 150
+
 /**
  * Sanduhr-Effekt: ein Partikel pro tatsächlich erarbeiteter Sorte des Tages.
  * Reagiert auf Geräteneigung (mit Maus-Fallback), Canvas-Backing-Buffer wird
  * mit devicePixelRatio skaliert, sonst wirkt es auf Retina-Displays pixelig.
  */
-export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
+export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitType[]; hapticsEnabled: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imgCacheRef = useRef<Record<string, HTMLImageElement>>({})
   const sizeRef = useRef({ w: 0, h: 0 })
   const gravityRef = useRef({ x: 0, y: 1 })
   const targetGravityRef = useRef({ x: 0, y: 1 })
+  const hapticsRef = useRef(hapticsEnabled)
+  hapticsRef.current = hapticsEnabled
 
   useEffect(() => {
     // Tageswechsel (todaysHarvest wurde zurückgesetzt) oder erster echter
@@ -127,11 +132,24 @@ export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
       | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<'granted' | 'denied'> })
       | undefined
     const needsPermission = !!DOE && typeof DOE.requestPermission === 'function'
+    let permissionGranted = false
 
     function requestTiltPermission() {
+      if (permissionGranted) return
       DOE!.requestPermission!()
         .then((state) => {
-          if (state === 'granted') window.addEventListener('deviceorientation', onOrientation)
+          if (state === 'granted') {
+            permissionGranted = true
+            window.addEventListener('deviceorientation', onOrientation)
+            parent?.removeEventListener('click', requestTiltPermission)
+            parent?.removeEventListener('touchend', requestTiltPermission)
+          }
+          // Bei 'denied' bleibt der Listener bewusst aktiv: iOS beantwortet
+          // wiederholte requestPermission()-Aufrufe zwar weiterhin mit
+          // 'denied' (kein erneuter Dialog ohne Änderung in den
+          // Geräteeinstellungen), aber falls der allererste Aufruf aus
+          // irgendeinem Grund nie sauber aufgelöst wurde, kann so ein
+          // späterer Tap es erneut versuchen, statt endgültig aufzugeben.
         })
         .catch(() => {})
     }
@@ -139,8 +157,10 @@ export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
     const parent = canvas.parentElement
     if (needsPermission) {
       // iOS verlangt zwingend eine Nutzergeste für requestPermission() – kann
-      // nicht vorab ohne Tap erteilt werden.
-      parent?.addEventListener('click', requestTiltPermission, { once: true })
+      // nicht vorab ohne Tap erteilt werden. Kein {once:true}: bewusst bei
+      // jedem Tap erneut versuchen, bis die Erlaubnis tatsächlich erteilt ist.
+      parent?.addEventListener('click', requestTiltPermission)
+      parent?.addEventListener('touchend', requestTiltPermission)
     } else if (window.DeviceOrientationEvent) {
       // Android/Desktop mit Sensoren brauchen keine Erlaubnis – sofort lauschen,
       // statt unnötig auf einen ersten Tap zu warten.
@@ -166,6 +186,7 @@ export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
     canvas.addEventListener('pointerleave', onPointerLeave)
 
     let rafId = 0
+    let lastVibrateAt = 0
     function step() {
       const { w: W, h: H } = sizeRef.current
       const gravity = gravityRef.current
@@ -174,6 +195,7 @@ export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
       gravity.y += (target.y - gravity.y) * 0.06
 
       const particles = sharedParticles
+      let anyHardHit = false
       particles.forEach((p) => {
         p.vx += gravity.x * 0.3
         p.vy += gravity.y * 0.3
@@ -181,23 +203,40 @@ export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
         p.vy *= 0.93
         p.x += p.vx
         p.y += p.vy
+        // Aufprall-Stärke VOR dem Clamping messen, sonst wäre sie nach dem
+        // Bounce künstlich klein und ein ruhig liegendes Partikel (das jeden
+        // Frame am Rand "anliegt") würde dauerhaft mitzählen.
+        const speed = Math.hypot(p.vx, p.vy)
+        let hit = false
         if (p.x - p.r < 0) {
           p.x = p.r
           p.vx *= -0.3
+          hit = true
         }
         if (p.x + p.r > W) {
           p.x = W - p.r
           p.vx *= -0.3
+          hit = true
         }
         if (p.y - p.r < 0) {
           p.y = p.r
           p.vy *= -0.3
+          hit = true
         }
         if (p.y + p.r > H) {
           p.y = H - p.r
           p.vy *= -0.3
+          hit = true
         }
+        if (hit && speed > HAPTIC_MIN_SPEED) anyHardHit = true
       })
+      if (anyHardHit && hapticsRef.current && 'vibrate' in navigator) {
+        const now = performance.now()
+        if (now - lastVibrateAt > HAPTIC_THROTTLE_MS) {
+          navigator.vibrate(12)
+          lastVibrateAt = now
+        }
+      }
 
       for (let iter = 0; iter < 3; iter++) {
         for (let i = 0; i < particles.length; i++) {
@@ -242,6 +281,7 @@ export function SandCanvas({ fruitTypes }: { fruitTypes: FruitType[] }) {
       window.removeEventListener('resize', sizeCanvas)
       window.removeEventListener('deviceorientation', onOrientation)
       parent?.removeEventListener('click', requestTiltPermission)
+      parent?.removeEventListener('touchend', requestTiltPermission)
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerleave', onPointerLeave)
     }

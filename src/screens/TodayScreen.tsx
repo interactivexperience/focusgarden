@@ -38,7 +38,7 @@ export function TodayScreen() {
   const focusHours = (state.todaysHarvest.length * (state.totalSeconds / 3600)).toFixed(1)
 
   return (
-    <div className="flex-1 flex flex-col px-5 pt-9 pb-4 overflow-y-auto">
+    <div className="flex-1 flex flex-col px-5 pt-9 pb-24 overflow-y-auto">
       <AppHeader streak={state.streak} />
       <div className="text-[11px] text-ink-faint font-semibold mb-4">Heute · {formatDate(new Date())}</div>
 

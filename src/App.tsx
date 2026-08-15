@@ -21,7 +21,7 @@ function AppShell() {
   return (
     <div className="flex flex-col h-dvh bg-bg-app mx-auto max-w-[480px] overflow-hidden">
       <PullToRefresh>
-        <div className={`flex-1 flex flex-col relative overflow-hidden ${showNav ? 'pb-20' : ''}`}>
+        <div className="flex-1 flex flex-col relative overflow-hidden">
           {(state.screen === 'start' || state.screen === 'timeSheet') && <StartScreen />}
           {state.screen === 'timeSheet' && <TimeSheet />}
           {state.screen === 'running' && <RunningScreen />}

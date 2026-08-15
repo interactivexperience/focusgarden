@@ -50,7 +50,7 @@ export function SettingsScreen({ onOpenWidgetPreview }: { onOpenWidgetPreview: (
   }
 
   return (
-    <div className="flex-1 flex flex-col px-5 pt-9 pb-4 overflow-y-auto">
+    <div className="flex-1 flex flex-col px-5 pt-9 pb-24 overflow-y-auto">
       <AppHeader />
       <div className="font-display text-[17px] font-bold mb-0.5">Einstellungen</div>
       <div className="text-[11.5px] text-ink-soft font-semibold mb-3.5">Sound &amp; Benachrichtigungen</div>

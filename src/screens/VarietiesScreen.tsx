@@ -59,7 +59,7 @@ export function VarietiesScreen() {
       <div className="text-[11.5px] text-ink-soft font-semibold mb-3.5">
         {discovered.size} von {FRUIT_KEYS.length} entdeckt
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-20">
         <VarietyGroup title="Obst" types={obst} discovered={discovered} />
         <VarietyGroup title="Gemüse" types={gemuese} discovered={discovered} />
       </div>
