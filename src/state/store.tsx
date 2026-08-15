@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useReducer, useRef, type ReactNode } from 'react'
 import { type FruitType, randomFruitType } from '../lib/fruits'
-import { presetForMinutes, TIME_PRESETS } from '../lib/presets'
+import { CYCLES_UNTIL_LONG_BREAK, longBreakMinutes, presetForMinutes, TIME_PRESETS } from '../lib/presets'
 import { loadStoredState, saveStoredState, todayDateKey, type SoundState, type StoredState } from '../lib/storage'
+import { playChime } from '../lib/sound'
 import { streakOnHarvest, streakOnNewDay } from '../lib/streak'
 
 export type Screen =
@@ -9,10 +10,20 @@ export type Screen =
   | 'timeSheet'
   | 'running'
   | 'harvest'
+  | 'break'
   | 'today'
   | 'varieties'
   | 'widget'
   | 'settings'
+
+/** Pause-Dauer für die gerade beendete Fokuszeit: Preset-Wert falls bekannt,
+ *  sonst 1/5 der Fokuszeit (klassisches 25/5-Verhältnis), auf 5 Minuten gerundet. */
+function breakMinutesForSession(totalSeconds: number, selectedPresetName: string | null): number {
+  const preset = selectedPresetName ? TIME_PRESETS.find((p) => p.name === selectedPresetName) : undefined
+  if (preset) return preset.breakMinutes
+  const focusMinutes = totalSeconds / 60
+  return Math.max(5, Math.round(focusMinutes / 5 / 5) * 5)
+}
 
 interface State {
   screen: Screen
@@ -36,6 +47,14 @@ interface State {
    *  sofort wieder den korrekten Stand zeigen, statt Zeit "verloren" zu haben. */
   sessionEndAt: number | null
   harvestReplayTick: number
+  /** Restzeit der laufenden Pause in Sekunden – analog zu remainingSeconds für den Fokus-Timer. */
+  breakRemainingSeconds: number
+  /** Timestamp (ms), zu dem die laufende Pause endet – analog zu sessionEndAt. */
+  breakEndAt: number | null
+  /** Ob die aktuelle/nächste Pause die lange Pause nach CYCLES_UNTIL_LONG_BREAK Runden ist. */
+  isLongBreak: boolean
+  /** Anzahl abgeschlossener Fokuszeiten seit der letzten langen Pause (0 bis CYCLES_UNTIL_LONG_BREAK-1). */
+  cycleCount: number
 }
 
 const DEFAULT_MINUTES = 25
@@ -62,6 +81,10 @@ function initState(): State {
       activeDayKey: today,
       sessionEndAt: null,
       harvestReplayTick: 0,
+      breakRemainingSeconds: 0,
+      breakEndAt: null,
+      isLongBreak: false,
+      cycleCount: 0,
     }
   }
 
@@ -88,6 +111,10 @@ function initState(): State {
     activeDayKey: today,
     sessionEndAt: null,
     harvestReplayTick: 0,
+    breakRemainingSeconds: 0,
+    breakEndAt: null,
+    isLongBreak: false,
+    cycleCount: stored.cycleCount ?? 0,
   }
 }
 
@@ -102,8 +129,10 @@ type Action =
   | { type: 'TOGGLE_PAUSE' }
   | { type: 'RESET_AFTER_STOP' }
   | { type: 'REPLAY_HARVEST' }
-  | { type: 'ACK_HARVEST' }
   | { type: 'TOGGLE_SOUND'; key: keyof SoundState }
+  | { type: 'START_BREAK' }
+  | { type: 'SYNC_BREAK_TIME' }
+  | { type: 'SKIP_BREAK' }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -202,11 +231,33 @@ function reducer(state: State, action: Action): State {
     case 'REPLAY_HARVEST':
       return { ...state, harvestReplayTick: state.harvestReplayTick + 1 }
 
-    case 'ACK_HARVEST':
-      return { ...state, screen: 'start' }
-
     case 'TOGGLE_SOUND':
       return { ...state, soundState: { ...state.soundState, [action.key]: !state.soundState[action.key] } }
+
+    case 'START_BREAK': {
+      const cycleCount = state.cycleCount + 1
+      const isLongBreak = cycleCount >= CYCLES_UNTIL_LONG_BREAK
+      const breakMin = breakMinutesForSession(state.totalSeconds, state.selectedPresetName)
+      const breakSeconds = (isLongBreak ? longBreakMinutes(breakMin) : breakMin) * 60
+      return {
+        ...state,
+        screen: 'break',
+        cycleCount: isLongBreak ? 0 : cycleCount,
+        isLongBreak,
+        breakRemainingSeconds: breakSeconds,
+        breakEndAt: Date.now() + breakSeconds * 1000,
+      }
+    }
+
+    case 'SYNC_BREAK_TIME': {
+      if (state.screen !== 'break' || state.breakEndAt === null) return state
+      const remaining = Math.max(0, Math.round((state.breakEndAt - Date.now()) / 1000))
+      if (remaining > 0) return { ...state, breakRemainingSeconds: remaining }
+      return { ...state, screen: 'start', breakEndAt: null, breakRemainingSeconds: 0 }
+    }
+
+    case 'SKIP_BREAK':
+      return { ...state, screen: 'start', breakEndAt: null, breakRemainingSeconds: 0 }
 
     default:
       return state
@@ -223,8 +274,9 @@ interface FocusGardenApi {
   togglePause: () => void
   resetAfterStop: () => void
   replayHarvest: () => void
-  ackHarvest: () => void
   toggleSound: (key: keyof SoundState) => void
+  startBreak: () => void
+  skipBreak: () => void
 }
 
 const FocusGardenContext = createContext<FocusGardenApi | null>(null)
@@ -253,6 +305,28 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Analog zum Fokus-Timer: berechnet die Pausen-Restzeit bei jedem Tick aus
+  // breakEndAt neu, damit auch eine gedrosselte Pause (Bildschirm aus, Tab im
+  // Hintergrund) beim Zurückkehren sofort den korrekten Stand zeigt. Der Chime
+  // wird hier (nicht im Reducer) ausgelöst, da Sound-Wiedergabe ein Seiteneffekt ist.
+  useEffect(() => {
+    const syncBreak = () => {
+      const s = stateRef.current
+      if (s.screen !== 'break' || s.breakEndAt === null) return
+      const remaining = Math.max(0, Math.round((s.breakEndAt - Date.now()) / 1000))
+      if (remaining <= 0 && s.soundState.breakEnd) {
+        playChime()
+      }
+      dispatch({ type: 'SYNC_BREAK_TIME' })
+    }
+    const id = window.setInterval(syncBreak, 1000)
+    document.addEventListener('visibilitychange', syncBreak)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', syncBreak)
+    }
+  }, [])
+
   // Screen Wake Lock: verhindert best-effort, dass der Bildschirm während
   // einer laufenden (nicht pausierten) Fokuszeit einschläft. Wird von manchen
   // Browsern nicht unterstützt oder kann fehlschlagen (z.B. Energiesparmodus) –
@@ -265,7 +339,7 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
 
     let sentinel: { release: () => Promise<void> } | null = null
     let cancelled = false
-    const shouldHold = state.screen === 'running' && !state.sessionPaused
+    const shouldHold = (state.screen === 'running' && !state.sessionPaused) || state.screen === 'break'
 
     async function acquire() {
       try {
@@ -316,6 +390,7 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
       lastHarvestDate: state.lastHarvestDate,
       discoveredTypes: state.discoveredTypes,
       streak: state.streak,
+      cycleCount: state.cycleCount,
     }
     saveStoredState(toPersist)
   }, [
@@ -326,6 +401,7 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
     state.lastHarvestDate,
     state.discoveredTypes,
     state.streak,
+    state.cycleCount,
   ])
 
   const api: FocusGardenApi = {
@@ -338,8 +414,9 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
     togglePause: () => dispatch({ type: 'TOGGLE_PAUSE' }),
     resetAfterStop: () => dispatch({ type: 'RESET_AFTER_STOP' }),
     replayHarvest: () => dispatch({ type: 'REPLAY_HARVEST' }),
-    ackHarvest: () => dispatch({ type: 'ACK_HARVEST' }),
     toggleSound: (key) => dispatch({ type: 'TOGGLE_SOUND', key }),
+    startBreak: () => dispatch({ type: 'START_BREAK' }),
+    skipBreak: () => dispatch({ type: 'SKIP_BREAK' }),
   }
 
   return <FocusGardenContext.Provider value={api}>{children}</FocusGardenContext.Provider>

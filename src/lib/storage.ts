@@ -14,6 +14,8 @@ export interface StoredState {
   lastHarvestDate: string
   discoveredTypes: FruitType[]
   streak: number
+  /** Anzahl abgeschlossener Fokuszeiten seit der letzten langen Pause (0–3). */
+  cycleCount: number
 }
 
 const STORAGE_KEY = 'fokusgarten_state_v1'

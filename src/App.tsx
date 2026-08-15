@@ -1,6 +1,7 @@
 import { BottomNav } from './components/BottomNav'
 import { PullToRefresh } from './components/PullToRefresh'
 import { useLockPortrait } from './hooks/useLockPortrait'
+import { BreakScreen } from './screens/BreakScreen'
 import { HarvestScreen } from './screens/HarvestScreen'
 import { RunningScreen } from './screens/RunningScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
@@ -26,6 +27,7 @@ function AppShell() {
           {state.screen === 'timeSheet' && <TimeSheet />}
           {state.screen === 'running' && <RunningScreen />}
           {state.screen === 'harvest' && <HarvestScreen />}
+          {state.screen === 'break' && <BreakScreen />}
           {state.screen === 'today' && <TodayScreen />}
           {state.screen === 'varieties' && <VarietiesScreen />}
           {state.screen === 'settings' && <SettingsScreen onOpenWidgetPreview={() => navigate('widget')} />}

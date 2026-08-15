@@ -49,6 +49,14 @@ export const CUSTOM_MIN_MINUTES = 5
 export const CUSTOM_MAX_MINUTES = 90
 export const CUSTOM_STEP_MINUTES = 5
 
+/** Klassisches Pomodoro-Muster: nach jeweils 4 Fokuszeiten eine lange statt
+ *  einer kurzen Pause (FocusPomo-Standard: "3 kurze Pausen vor der langen"). */
+export const CYCLES_UNTIL_LONG_BREAK = 4
+
+export function longBreakMinutes(breakMinutes: number): number {
+  return Math.min(breakMinutes * 3, 30)
+}
+
 export function presetForMinutes(minutes: number): TimePreset | undefined {
   return TIME_PRESETS.find((p) => p.minutes === minutes)
 }

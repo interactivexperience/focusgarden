@@ -34,7 +34,7 @@ function buildFallItem(type: FruitType): FallItem {
 }
 
 export function HarvestScreen() {
-  const { state, replayHarvest, ackHarvest } = useFocusGarden()
+  const { state, replayHarvest, startBreak } = useFocusGarden()
   const [item, setItem] = useState<FallItem | null>(null)
 
   useEffect(() => {
@@ -100,10 +100,10 @@ export function HarvestScreen() {
       <div className="relative z-10 mt-auto mb-4 flex flex-col items-center gap-2.5 px-6">
         <button
           type="button"
-          onClick={ackHarvest}
+          onClick={startBreak}
           className="bg-leaf text-white font-bold text-[14.5px] px-9 py-4 rounded-full shadow-[0_8px_18px_rgba(111,169,108,0.28)] active:scale-[0.94] transition-transform"
         >
-          Weiter
+          Pause starten
         </button>
         <button
           type="button"
