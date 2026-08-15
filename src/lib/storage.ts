@@ -1,9 +1,17 @@
+import type { DayPlanBlock } from './dayplan'
 import type { FruitType } from './fruits'
 
 export interface SoundState {
   focusEnd: boolean
   breakEnd: boolean
   haptics: boolean
+}
+
+export interface StoredDayPlan {
+  blocks: DayPlanBlock[]
+  /** Lokaler Kalendertag, für den der Plan erstellt wurde – ein Plan von gestern
+   *  darf nicht in den neuen Tag hinein aktiv bleiben. */
+  dateKey: string
 }
 
 export interface StoredState {
@@ -16,6 +24,10 @@ export interface StoredState {
   streak: number
   /** Anzahl abgeschlossener Fokuszeiten seit der letzten langen Pause (0–3). */
   cycleCount: number
+  /** Aktiver Tagesplan, falls über "Tag planen" übernommen. */
+  dayPlan: StoredDayPlan | null
+  /** Index des nächsten noch nicht gestarteten Blocks in dayPlan.blocks. */
+  currentBlockIndex: number
 }
 
 const STORAGE_KEY = 'fokusgarten_state_v1'

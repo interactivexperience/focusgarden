@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useReducer, useRef, type ReactNode } from 'react'
+import { nextActionableBlock, type DayPlanBlock } from '../lib/dayplan'
 import { type FruitType, randomFruitType } from '../lib/fruits'
 import { CYCLES_UNTIL_LONG_BREAK, longBreakMinutes, presetForMinutes, TIME_PRESETS } from '../lib/presets'
 import { loadStoredState, saveStoredState, todayDateKey, type SoundState, type StoredState } from '../lib/storage'
@@ -15,6 +16,13 @@ export type Screen =
   | 'varieties'
   | 'widget'
   | 'settings'
+  | 'dayPlan'
+
+export interface ActiveDayPlan {
+  blocks: DayPlanBlock[]
+  /** Lokaler Kalendertag, für den der Plan erstellt wurde. */
+  dateKey: string
+}
 
 /** Pause-Dauer für die gerade beendete Fokuszeit: Preset-Wert falls bekannt,
  *  sonst 1/5 der Fokuszeit (klassisches 25/5-Verhältnis), auf 5 Minuten gerundet. */
@@ -55,6 +63,10 @@ interface State {
   isLongBreak: boolean
   /** Anzahl abgeschlossener Fokuszeiten seit der letzten langen Pause (0 bis CYCLES_UNTIL_LONG_BREAK-1). */
   cycleCount: number
+  /** Aktiver Tagesplan, falls über "Tag planen" übernommen – ersetzt die manuelle Zeitwahl. */
+  dayPlan: ActiveDayPlan | null
+  /** Index des nächsten noch nicht gestarteten Blocks in dayPlan.blocks. */
+  currentBlockIndex: number
 }
 
 const DEFAULT_MINUTES = 25
@@ -85,9 +97,14 @@ function initState(): State {
       breakEndAt: null,
       isLongBreak: false,
       cycleCount: 0,
+      dayPlan: null,
+      currentBlockIndex: 0,
     }
   }
 
+  // Ein Tagesplan von einem früheren Kalendertag darf nicht in den neuen Tag
+  // hinein aktiv bleiben – analog zum täglichen Zurücksetzen von todaysHarvest.
+  const storedPlanStillValid = stored.dayPlan && stored.dayPlan.dateKey === today
   const lastHarvestDate = stored.lastHarvestDate ?? ''
   const isNewDay = lastHarvestDate !== today
   const streak = isNewDay ? streakOnNewDay(stored.streak ?? 0, lastHarvestDate, today) : (stored.streak ?? 0)
@@ -115,6 +132,8 @@ function initState(): State {
     breakEndAt: null,
     isLongBreak: false,
     cycleCount: stored.cycleCount ?? 0,
+    dayPlan: storedPlanStillValid ? stored.dayPlan : null,
+    currentBlockIndex: storedPlanStillValid ? (stored.currentBlockIndex ?? 0) : 0,
   }
 }
 
@@ -133,6 +152,9 @@ type Action =
   | { type: 'START_BREAK' }
   | { type: 'SYNC_BREAK_TIME' }
   | { type: 'SKIP_BREAK' }
+  | { type: 'APPLY_DAY_PLAN'; blocks: DayPlanBlock[] }
+  | { type: 'LEAVE_DAY_PLAN' }
+  | { type: 'START_PLAN_BLOCK' }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -203,11 +225,14 @@ function reducer(state: State, action: Action): State {
     case 'CHECK_DAY_ROLLOVER': {
       const today = todayDateKey()
       if (state.activeDayKey === today) return state
+      const planStillValid = state.dayPlan && state.dayPlan.dateKey === today
       return {
         ...state,
         activeDayKey: today,
         todaysHarvest: [],
         streak: streakOnNewDay(state.streak, state.lastHarvestDate, today),
+        dayPlan: planStillValid ? state.dayPlan : null,
+        currentBlockIndex: planStillValid ? state.currentBlockIndex : 0,
       }
     }
 
@@ -259,6 +284,41 @@ function reducer(state: State, action: Action): State {
     case 'SKIP_BREAK':
       return { ...state, screen: 'start', breakEndAt: null, breakRemainingSeconds: 0 }
 
+    case 'APPLY_DAY_PLAN':
+      return { ...state, dayPlan: { blocks: action.blocks, dateKey: todayDateKey() }, currentBlockIndex: 0, screen: 'start' }
+
+    case 'LEAVE_DAY_PLAN':
+      return { ...state, dayPlan: null, currentBlockIndex: 0 }
+
+    case 'START_PLAN_BLOCK': {
+      if (!state.dayPlan) return state
+      const next = nextActionableBlock(state.dayPlan.blocks, state.currentBlockIndex)
+      if (!next) return state
+      const { block, index } = next
+      const seconds = block.minutes * 60
+      if (block.type === 'focus') {
+        return {
+          ...state,
+          currentBlockIndex: index + 1,
+          // totalSeconds mitführen, damit z.B. die "X Min Fokus"-Anzeige auf dem
+          // Ernte-Screen nach einem Plan-Block die tatsächliche Dauer zeigt.
+          totalSeconds: seconds,
+          remainingSeconds: seconds,
+          sessionEndAt: Date.now() + seconds * 1000,
+          sessionPaused: false,
+          screen: 'running',
+        }
+      }
+      return {
+        ...state,
+        currentBlockIndex: index + 1,
+        isLongBreak: block.type === 'longbreak',
+        breakRemainingSeconds: seconds,
+        breakEndAt: Date.now() + seconds * 1000,
+        screen: 'break',
+      }
+    }
+
     default:
       return state
   }
@@ -277,6 +337,9 @@ interface FocusGardenApi {
   toggleSound: (key: keyof SoundState) => void
   startBreak: () => void
   skipBreak: () => void
+  applyDayPlan: (blocks: DayPlanBlock[]) => void
+  leaveDayPlan: () => void
+  startNextPlanBlock: () => void
 }
 
 const FocusGardenContext = createContext<FocusGardenApi | null>(null)
@@ -391,6 +454,8 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
       discoveredTypes: state.discoveredTypes,
       streak: state.streak,
       cycleCount: state.cycleCount,
+      dayPlan: state.dayPlan,
+      currentBlockIndex: state.currentBlockIndex,
     }
     saveStoredState(toPersist)
   }, [
@@ -402,6 +467,8 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
     state.discoveredTypes,
     state.streak,
     state.cycleCount,
+    state.dayPlan,
+    state.currentBlockIndex,
   ])
 
   const api: FocusGardenApi = {
@@ -417,6 +484,9 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
     toggleSound: (key) => dispatch({ type: 'TOGGLE_SOUND', key }),
     startBreak: () => dispatch({ type: 'START_BREAK' }),
     skipBreak: () => dispatch({ type: 'SKIP_BREAK' }),
+    applyDayPlan: (blocks) => dispatch({ type: 'APPLY_DAY_PLAN', blocks }),
+    leaveDayPlan: () => dispatch({ type: 'LEAVE_DAY_PLAN' }),
+    startNextPlanBlock: () => dispatch({ type: 'START_PLAN_BLOCK' }),
   }
 
   return <FocusGardenContext.Provider value={api}>{children}</FocusGardenContext.Provider>

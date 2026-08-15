@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types src/lib/streak.test.ts"
+    "test": "node --experimental-strip-types src/lib/streak.test.ts && node --experimental-strip-types src/lib/dayplan.test.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

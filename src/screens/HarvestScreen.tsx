@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppIcon, FruitIcon } from '../lib/assets'
+import { nextActionableBlock } from '../lib/dayplan'
 import type { FruitType } from '../lib/fruits'
 import { FRUIT_NAMES } from '../lib/fruits'
 import { playChime } from '../lib/sound'
@@ -34,8 +35,26 @@ function buildFallItem(type: FruitType): FallItem {
 }
 
 export function HarvestScreen() {
-  const { state, replayHarvest, startBreak } = useFocusGarden()
+  const { state, navigate, replayHarvest, startBreak, startNextPlanBlock } = useFocusGarden()
   const [item, setItem] = useState<FallItem | null>(null)
+  const planNext = state.dayPlan ? nextActionableBlock(state.dayPlan.blocks, state.currentBlockIndex) : null
+
+  function handleContinue() {
+    if (state.dayPlan) {
+      if (planNext) startNextPlanBlock()
+      else navigate('start')
+      return
+    }
+    startBreak()
+  }
+
+  const continueLabel = state.dayPlan
+    ? planNext
+      ? planNext.block.type === 'focus'
+        ? 'Nächster Fokusblock'
+        : 'Pause starten'
+      : 'Fertig'
+    : 'Pause starten'
 
   useEffect(() => {
     if (!state.lastHarvestType) return
@@ -100,10 +119,10 @@ export function HarvestScreen() {
       <div className="relative z-10 mt-auto mb-4 flex flex-col items-center gap-2.5 px-6">
         <button
           type="button"
-          onClick={startBreak}
+          onClick={handleContinue}
           className="bg-leaf text-white font-bold text-[14.5px] px-9 py-4 rounded-full shadow-[0_8px_18px_rgba(111,169,108,0.28)] active:scale-[0.94] transition-transform"
         >
-          Pause starten
+          {continueLabel}
         </button>
         <button
           type="button"
