@@ -67,12 +67,19 @@ function attachOrientationListener() {
   window.addEventListener('deviceorientation', onDeviceOrientation)
 }
 
-/** Auf iOS zwingend aus einer echten Nutzergeste heraus aufgerufen (nicht
+/** Auf iOS MUSS DeviceOrientationEvent.requestPermission() aus einer echten,
+ *  synchronen Nutzergeste (Klick/Touch) heraus aufgerufen werden. Ruft man es
+ *  stattdessen z.B. in einem useEffect beim Mounten auf (keine Geste), lehnt
+ *  iOS die Anfrage nicht nur kommentarlos ab, sondern merkt sich das für den
+ *  gesamten Origin dauerhaft – alle späteren, selbst echt geste-getriggerten
+ *  Versuche liefern danach nur noch 'denied', ohne je wieder einen Dialog zu
+ *  zeigen (nicht mal nach einem harten Reload). Deshalb wird diese Funktion
+ *  ausschließlich aus den page-weiten click/touchend-Listenern unten
+ *  aufgerufen – niemals direkt aus einem Komponenten-Mount o.ä. Nicht
  *  {once:true}, damit auch ein erster erfolgloser Versuch spätere Taps nicht
- *  dauerhaft blockiert). Page-weit statt nur auf dem Canvas-Elternelement,
+ *  dauerhaft blockiert. Page-weit statt nur auf dem Canvas-Elternelement,
  *  damit JEDER Tap irgendwo in der App – auch "Fokus starten" selbst – die
- *  Berechtigung auslösen kann, statt einen eigenen Tap exakt auf dem
- *  Start-Screen vor jeder Navigation zu erfordern. */
+ *  Berechtigung auslösen kann. */
 function ensureTiltPermission() {
   if (orientationPermissionGranted) return
   const DOE = window.DeviceOrientationEvent as
@@ -101,6 +108,17 @@ function ensureTiltPermission() {
 if (typeof document !== 'undefined') {
   document.addEventListener('click', ensureTiltPermission)
   document.addEventListener('touchend', ensureTiltPermission)
+
+  // Android/Desktop mit Sensoren brauchen keine Geste-Berechtigung – dort
+  // sofort aktivieren statt auf den ersten Tap zu warten. Der Check hier
+  // stellt sicher, dass NIE requestPermission() selbst außerhalb einer Geste
+  // aufgerufen wird (nur der reine "gibt es die Methode?"-Test).
+  const doe = window.DeviceOrientationEvent as
+    | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<'granted' | 'denied'> })
+    | undefined
+  if (doe && typeof doe.requestPermission !== 'function') {
+    ensureTiltPermission()
+  }
 }
 
 const FRUIT_COLOR: Partial<Record<FruitType, string>> = {
@@ -192,13 +210,6 @@ export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitTy
 
     sizeCanvas()
     window.addEventListener('resize', sizeCanvas)
-
-    // Sofort versuchen: falls schon einmal (in dieser oder einer früheren
-    // Sitzung dieses Mounts) erteilt, hängt attachOrientationListener() den
-    // echten Sensor-Listener direkt an; auf iOS ohne vorherige Erlaubnis
-    // passiert hier nichts, bis der page-weite Tap-Listener (Modul-Ebene)
-    // requestPermission() aus einer Nutzergeste heraus auslöst.
-    ensureTiltPermission()
 
     function onPointerMove(e: PointerEvent) {
       // Maus-Fallback fürs Desktop-Testen: horizontale Position simuliert
