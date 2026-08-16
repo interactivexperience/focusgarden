@@ -170,12 +170,19 @@ export function SunflowerIcon({
   return (
     <img
       src={src}
-      width={size}
-      height={size}
       alt=""
       draggable={false}
       className={className}
-      style={{ display: 'block', objectFit: 'contain', width: size, height: size }}
+      // Bewusst KEINE width/height-HTML-Attribute: die Sonnenblumen-PNGs sind
+      // hochformatig (z.B. 316×400), nicht quadratisch. width/height-Attribute
+      // mit gleichem Wert (size×size) würden dem Browser ein falsches
+      // quadratisches Seitenverhältnis suggerieren – object-fit:contain nutzt
+      // dieses (falsche) deklarierte Verhältnis teils statt des echten, sobald
+      // das Bild geladen ist, wodurch der Inhalt verzerrt/verschoben gerendert
+      // wird (auf iOS Safari beobachtet: Blume wirkt nach rechts verschoben/
+      // "abgeschnitten"). Nur die CSS-Box (width) ist quadratisch begrenzt,
+      // die Höhe ergibt sich korrekt aus dem echten Seitenverhältnis.
+      style={{ display: 'block', objectFit: 'contain', objectPosition: 'center', width: size, height: size }}
     />
   )
 }
