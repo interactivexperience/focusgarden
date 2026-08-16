@@ -38,18 +38,27 @@ let orientationPermissionGranted = false
 let orientationListenerAttached = false
 
 function onDeviceOrientation(e: DeviceOrientationEvent) {
-  // gamma: Links-Rechts-Neigung (Roll) -> horizontale Schwerkraft.
+  // gamma: Links-Rechts-Neigung (Roll) -> horizontale Schwerkraft-Komponente.
   const gamma = e.gamma ?? 0
-  const x = Math.max(-1, Math.min(1, gamma / 32))
-  // beta: Vor-Zurück-Neigung (Pitch). 90° = aufrecht in der Hand (Referenz-
-  // haltung), Formel gibt dort +1 (voll runter). Kippt man das Handy nach
-  // hinten, sinkt beta Richtung 0 und die Y-Schwerkraft schwächt sich ab;
-  // dreht man es weiter bis auf den Kopf (beta Richtung 270/-90), wird der
-  // Wert negativ – die Sorten fallen dann Richtung Bildschirm-Oberkante,
-  // nicht nur seitwärts wie zuvor.
+  const xRaw = Math.max(-1, Math.min(1, gamma / 32))
+  // beta: Vor-Zurück-Neigung (Pitch). 90° = aufrecht in der Hand, Formel gibt
+  // dort volle Y-Komponente. Kippt man das Handy nach hinten, sinkt beta
+  // Richtung 0; dreht man es weiter bis auf den Kopf, wird der Wert negativ –
+  // die Sorten fallen dann Richtung Bildschirm-Oberkante statt nur seitwärts.
   const beta = e.beta ?? 90
-  const y = Math.cos(((beta - 90) * Math.PI) / 180)
-  sharedTargetGravity = { x, y }
+  const yRaw = Math.cos(((beta - 90) * Math.PI) / 180)
+  // Nur die RICHTUNG kommt aus dem Winkel, nicht die STÄRKE: eine reine
+  // Kombination aus xRaw/yRaw wäre bei jeder Nichtreferenzhaltung (z.B. Handy
+  // beim natürlichen Halten nicht exakt bei beta=90°) spürbar schwächer als
+  // "voll" – Sorten fielen dann sichtbar langsamer und wirkten wie
+  // "hängengeblieben", statt einfach nur seltener/leichter zu tippen. Ein
+  // echtes Sanduhr-Glas hat unabhängig vom genauen Haltewinkel eine
+  // durchgehend spürbare Schwerkraft; nur bei nahezu flacher Haltung (Handy
+  // liegt wie ein Tablett, kaum Neigung erkennbar) gibt es keine sinnvolle
+  // Richtung – dann bleibt die letzte Richtung erhalten statt zu jittern.
+  const magnitude = Math.hypot(xRaw, yRaw)
+  if (magnitude < 0.05) return
+  sharedTargetGravity = { x: xRaw / magnitude, y: yRaw / magnitude }
 }
 
 function attachOrientationListener() {
