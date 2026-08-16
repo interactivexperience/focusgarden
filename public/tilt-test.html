@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tilt-Diagnose</title>
+    <style>
+      body {
+        font-family: -apple-system, system-ui, sans-serif;
+        padding: 20px;
+        background: #eaf4e4;
+        color: #3d3a34;
+      }
+      h1 {
+        font-size: 18px;
+      }
+      button {
+        font-size: 16px;
+        padding: 14px 20px;
+        border-radius: 12px;
+        border: none;
+        background: #4c8a52;
+        color: white;
+        font-weight: bold;
+        width: 100%;
+        margin: 12px 0;
+      }
+      .row {
+        background: white;
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin: 6px 0;
+        font-size: 14px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .row b {
+        font-variant-numeric: tabular-nums;
+      }
+      #log {
+        white-space: pre-wrap;
+        background: #222;
+        color: #0f0;
+        font-family: monospace;
+        font-size: 12px;
+        padding: 10px;
+        border-radius: 8px;
+        margin-top: 16px;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🧭 Tilt-Diagnose (Fokusgarten)</h1>
+
+    <div class="row"><span>DeviceOrientationEvent vorhanden?</span><b id="hasApi">–</b></div>
+    <div class="row"><span>requestPermission() vorhanden? (iOS)</span><b id="needsPerm">–</b></div>
+    <div class="row"><span>Berechtigungsstatus</span><b id="permState">noch nicht angefragt</b></div>
+
+    <button id="askBtn">Berechtigung anfragen &amp; Sensor testen</button>
+
+    <div class="row"><span>gamma (links/rechts)</span><b id="gamma">–</b></div>
+    <div class="row"><span>beta (vor/zurück)</span><b id="beta">–</b></div>
+    <div class="row"><span>alpha (Kompass)</span><b id="alpha">–</b></div>
+    <div class="row"><span>Events empfangen</span><b id="eventCount">0</b></div>
+
+    <div id="log"></div>
+
+    <script>
+      const log = (msg) => {
+        const el = document.getElementById('log')
+        el.textContent += msg + '\n'
+        el.scrollTop = el.scrollHeight
+      }
+
+      const hasApi = typeof window.DeviceOrientationEvent !== 'undefined'
+      document.getElementById('hasApi').textContent = hasApi ? 'ja' : 'nein'
+
+      const DOE = hasApi ? window.DeviceOrientationEvent : undefined
+      const needsPermission = !!DOE && typeof DOE.requestPermission === 'function'
+      document.getElementById('needsPerm').textContent = needsPermission ? 'ja' : 'nein'
+
+      let eventCount = 0
+      function onOrientation(e) {
+        eventCount++
+        document.getElementById('eventCount').textContent = String(eventCount)
+        document.getElementById('gamma').textContent = e.gamma === null ? 'null' : e.gamma.toFixed(1)
+        document.getElementById('beta').textContent = e.beta === null ? 'null' : e.beta.toFixed(1)
+        document.getElementById('alpha').textContent = e.alpha === null ? 'null' : e.alpha.toFixed(1)
+      }
+
+      document.getElementById('askBtn').addEventListener('click', () => {
+        log('Button getappt, needsPermission=' + needsPermission)
+        if (!hasApi) {
+          document.getElementById('permState').textContent = 'API nicht verfügbar'
+          log('DeviceOrientationEvent gibt es in diesem Browser gar nicht.')
+          return
+        }
+        if (!needsPermission) {
+          document.getElementById('permState').textContent = 'keine Anfrage nötig, lausche direkt'
+          window.addEventListener('deviceorientation', onOrientation)
+          log('Kein requestPermission nötig (Android/Desktop) – Listener direkt angehängt.')
+          return
+        }
+        document.getElementById('permState').textContent = 'anfrage läuft …'
+        log('Rufe DeviceOrientationEvent.requestPermission() auf …')
+        DOE.requestPermission()
+          .then((state) => {
+            document.getElementById('permState').textContent = state
+            log('requestPermission() aufgelöst mit: ' + state)
+            if (state === 'granted') {
+              window.addEventListener('deviceorientation', onOrientation)
+              log('Listener angehängt, warte auf deviceorientation-Events …')
+            }
+          })
+          .catch((err) => {
+            document.getElementById('permState').textContent = 'FEHLER: ' + err
+            log('requestPermission() ist fehlgeschlagen: ' + err)
+          })
+      })
+
+      log('Diagnose-Seite geladen. User-Agent: ' + navigator.userAgent)
+    </script>
+  </body>
+</html>
