@@ -27,10 +27,10 @@ function buildFallItem(type: FruitType): FallItem {
     duration: 1.9,
     swayPx: Math.round((Math.random() > 0.5 ? 1 : -1) * (14 + Math.random() * 18)),
     rot: Math.round((Math.random() > 0.5 ? 1 : -1) * (140 + Math.random() * 100)),
-    // Landet in der leeren Bildschirmmitte (Prozentwert, kein px-Offset vom
-    // unteren Rand) – dort überlappt es nicht mit "Weiter" / "Animation
-    // erneut abspielen" und bleibt über alle Bildschirmgrößen hinweg stabil.
-    landTop: 56 + Math.random() * 4,
+    // Landet nahe dem unteren Bildschirmrand (wie eine Sanduhr, nicht in der
+    // Mitte schwebend) – der Item-Container liegt hinter den Buttons (z-0 vs.
+    // z-10), daher gibt es dort keinen Interaktions- oder Sichtbarkeitskonflikt.
+    landTop: 82 + Math.random() * 4,
   }
 }
 
@@ -74,7 +74,7 @@ export function HarvestScreen() {
     return `@keyframes fall-${item.key} {
       0% { top: -16%; transform: translateX(0) rotate(0deg) scale(0.8); opacity: 0; }
       8% { opacity: 1; }
-      55% { top: 38%; transform: translateX(${Math.round(item.swayPx * 0.5)}px) rotate(${Math.round(item.rot * 0.4)}deg) scale(1.05); }
+      55% { top: 52%; transform: translateX(${Math.round(item.swayPx * 0.5)}px) rotate(${Math.round(item.rot * 0.4)}deg) scale(1.05); }
       100% { top: ${item.landTop}%; transform: translateX(${item.swayPx}px) rotate(${item.rot}deg) scale(1); opacity: 1; }
     }`
   }, [item])

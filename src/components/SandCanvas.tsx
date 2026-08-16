@@ -21,6 +21,79 @@ interface Particle {
  */
 let sharedParticles: Particle[] = []
 
+/**
+ * Auch Schwerkraft-Ziel/-Zustand und die iOS-Berechtigung leben auf Modul-Ebene:
+ * StartScreen (und damit SandCanvas) unmountet bei JEDER Navigation weg von
+ * "start" (Fokus läuft, Ernte, Pause …) und remountet beim Zurückkehren. Wären
+ * das lokale useRefs, würde die Neigungs-Berechtigung bei jedem Remount
+ * zurückgesetzt – in der Praxis ist der allererste Tap auf dem Start-Screen
+ * fast immer "Fokus starten", der sofort wegnavigiert, bevor requestPermission()
+ * überhaupt auflösen kann. Mit Modul-Ebene bleibt eine einmal erteilte
+ * Berechtigung für die gesamte Seiten-Lebensdauer aktiv, unabhängig davon,
+ * welcher Screen gerade sichtbar ist.
+ */
+let sharedGravity = { x: 0, y: 1 }
+let sharedTargetGravity = { x: 0, y: 1 }
+let orientationPermissionGranted = false
+let orientationListenerAttached = false
+
+function onDeviceOrientation(e: DeviceOrientationEvent) {
+  // gamma: Links-Rechts-Neigung (Roll) -> horizontale Schwerkraft.
+  const gamma = e.gamma ?? 0
+  const x = Math.max(-1, Math.min(1, gamma / 32))
+  // beta: Vor-Zurück-Neigung (Pitch). 90° = aufrecht in der Hand (Referenz-
+  // haltung), Formel gibt dort +1 (voll runter). Kippt man das Handy nach
+  // hinten, sinkt beta Richtung 0 und die Y-Schwerkraft schwächt sich ab;
+  // dreht man es weiter bis auf den Kopf (beta Richtung 270/-90), wird der
+  // Wert negativ – die Sorten fallen dann Richtung Bildschirm-Oberkante,
+  // nicht nur seitwärts wie zuvor.
+  const beta = e.beta ?? 90
+  const y = Math.cos(((beta - 90) * Math.PI) / 180)
+  sharedTargetGravity = { x, y }
+}
+
+function attachOrientationListener() {
+  if (orientationListenerAttached) return
+  orientationListenerAttached = true
+  window.addEventListener('deviceorientation', onDeviceOrientation)
+}
+
+/** Auf iOS zwingend aus einer echten Nutzergeste heraus aufgerufen (nicht
+ *  {once:true}, damit auch ein erster erfolgloser Versuch spätere Taps nicht
+ *  dauerhaft blockiert). Page-weit statt nur auf dem Canvas-Elternelement,
+ *  damit JEDER Tap irgendwo in der App – auch "Fokus starten" selbst – die
+ *  Berechtigung auslösen kann, statt einen eigenen Tap exakt auf dem
+ *  Start-Screen vor jeder Navigation zu erfordern. */
+function ensureTiltPermission() {
+  if (orientationPermissionGranted) return
+  const DOE = window.DeviceOrientationEvent as
+    | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<'granted' | 'denied'> })
+    | undefined
+  if (!DOE) return
+  if (typeof DOE.requestPermission !== 'function') {
+    // Android/Desktop mit Sensoren brauchen keine Erlaubnis.
+    orientationPermissionGranted = true
+    attachOrientationListener()
+    return
+  }
+  DOE.requestPermission()
+    .then((state) => {
+      if (state === 'granted') {
+        orientationPermissionGranted = true
+        attachOrientationListener()
+      }
+      // Bei 'denied' bewusst nichts weiter tun: der Listener bleibt aktiv und
+      // versucht es beim nächsten Tap erneut (falls der erste Versuch aus
+      // irgendeinem Grund nie sauber erteilt wurde).
+    })
+    .catch(() => {})
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', ensureTiltPermission)
+  document.addEventListener('touchend', ensureTiltPermission)
+}
+
 const FRUIT_COLOR: Partial<Record<FruitType, string>> = {
   tomato: '#FF6B5C',
   strawberry: '#FF7F93',
@@ -55,8 +128,6 @@ export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitTy
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imgCacheRef = useRef<Record<string, HTMLImageElement>>({})
   const sizeRef = useRef({ w: 0, h: 0 })
-  const gravityRef = useRef({ x: 0, y: 1 })
-  const targetGravityRef = useRef({ x: 0, y: 1 })
   const hapticsRef = useRef(hapticsEnabled)
   hapticsRef.current = hapticsEnabled
 
@@ -113,59 +184,12 @@ export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitTy
     sizeCanvas()
     window.addEventListener('resize', sizeCanvas)
 
-    function onOrientation(e: DeviceOrientationEvent) {
-      // gamma: Links-Rechts-Neigung (Roll) -> horizontale Schwerkraft.
-      const gamma = e.gamma ?? 0
-      const x = Math.max(-1, Math.min(1, gamma / 32))
-      // beta: Vor-Zurück-Neigung (Pitch). 90° = aufrecht in der Hand (Referenz-
-      // haltung), Formel gibt dort +1 (voll runter). Kippt man das Handy nach
-      // hinten, sinkt beta Richtung 0 und die Y-Schwerkraft schwächt sich ab;
-      // dreht man es weiter bis auf den Kopf (beta Richtung 270/-90), wird der
-      // Wert negativ – die Sorten fallen dann Richtung Bildschirm-Oberkante,
-      // nicht nur seitwärts wie zuvor.
-      const beta = e.beta ?? 90
-      const y = Math.cos(((beta - 90) * Math.PI) / 180)
-      targetGravityRef.current = { x, y }
-    }
-
-    const DOE = window.DeviceOrientationEvent as
-      | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<'granted' | 'denied'> })
-      | undefined
-    const needsPermission = !!DOE && typeof DOE.requestPermission === 'function'
-    let permissionGranted = false
-
-    function requestTiltPermission() {
-      if (permissionGranted) return
-      DOE!.requestPermission!()
-        .then((state) => {
-          if (state === 'granted') {
-            permissionGranted = true
-            window.addEventListener('deviceorientation', onOrientation)
-            parent?.removeEventListener('click', requestTiltPermission)
-            parent?.removeEventListener('touchend', requestTiltPermission)
-          }
-          // Bei 'denied' bleibt der Listener bewusst aktiv: iOS beantwortet
-          // wiederholte requestPermission()-Aufrufe zwar weiterhin mit
-          // 'denied' (kein erneuter Dialog ohne Änderung in den
-          // Geräteeinstellungen), aber falls der allererste Aufruf aus
-          // irgendeinem Grund nie sauber aufgelöst wurde, kann so ein
-          // späterer Tap es erneut versuchen, statt endgültig aufzugeben.
-        })
-        .catch(() => {})
-    }
-
-    const parent = canvas.parentElement
-    if (needsPermission) {
-      // iOS verlangt zwingend eine Nutzergeste für requestPermission() – kann
-      // nicht vorab ohne Tap erteilt werden. Kein {once:true}: bewusst bei
-      // jedem Tap erneut versuchen, bis die Erlaubnis tatsächlich erteilt ist.
-      parent?.addEventListener('click', requestTiltPermission)
-      parent?.addEventListener('touchend', requestTiltPermission)
-    } else if (window.DeviceOrientationEvent) {
-      // Android/Desktop mit Sensoren brauchen keine Erlaubnis – sofort lauschen,
-      // statt unnötig auf einen ersten Tap zu warten.
-      window.addEventListener('deviceorientation', onOrientation)
-    }
+    // Sofort versuchen: falls schon einmal (in dieser oder einer früheren
+    // Sitzung dieses Mounts) erteilt, hängt attachOrientationListener() den
+    // echten Sensor-Listener direkt an; auf iOS ohne vorherige Erlaubnis
+    // passiert hier nichts, bis der page-weite Tap-Listener (Modul-Ebene)
+    // requestPermission() aus einer Nutzergeste heraus auslöst.
+    ensureTiltPermission()
 
     function onPointerMove(e: PointerEvent) {
       // Maus-Fallback fürs Desktop-Testen: horizontale Position simuliert
@@ -174,13 +198,13 @@ export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitTy
       const rect = canvas!.getBoundingClientRect()
       const relX = (e.clientX - rect.left - rect.width / 2) / (rect.width / 2)
       const relY = (e.clientY - rect.top - rect.height / 2) / (rect.height / 2)
-      targetGravityRef.current = {
+      sharedTargetGravity = {
         x: Math.max(-1, Math.min(1, relX)),
         y: Math.max(-1, Math.min(1, relY)),
       }
     }
     function onPointerLeave() {
-      targetGravityRef.current = { x: 0, y: 1 }
+      sharedTargetGravity = { x: 0, y: 1 }
     }
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerleave', onPointerLeave)
@@ -189,10 +213,9 @@ export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitTy
     let lastVibrateAt = 0
     function step() {
       const { w: W, h: H } = sizeRef.current
-      const gravity = gravityRef.current
-      const target = targetGravityRef.current
-      gravity.x += (target.x - gravity.x) * 0.06
-      gravity.y += (target.y - gravity.y) * 0.06
+      sharedGravity.x += (sharedTargetGravity.x - sharedGravity.x) * 0.06
+      sharedGravity.y += (sharedTargetGravity.y - sharedGravity.y) * 0.06
+      const gravity = sharedGravity
 
       const particles = sharedParticles
       let anyHardHit = false
@@ -277,11 +300,11 @@ export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitTy
     rafId = requestAnimationFrame(step)
 
     return () => {
+      // Der deviceorientation-Listener selbst bleibt bewusst über den gesamten
+      // Seiten-Lebenszyklus bestehen (siehe attachOrientationListener) und wird
+      // hier nicht entfernt – nur die an dieses Canvas-Mount gebundenen Dinge.
       cancelAnimationFrame(rafId)
       window.removeEventListener('resize', sizeCanvas)
-      window.removeEventListener('deviceorientation', onOrientation)
-      parent?.removeEventListener('click', requestTiltPermission)
-      parent?.removeEventListener('touchend', requestTiltPermission)
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerleave', onPointerLeave)
     }
