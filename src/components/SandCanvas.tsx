@@ -22,6 +22,16 @@ interface Particle {
 let sharedParticles: Particle[] = []
 
 /**
+ * Auch der Bild-Cache lebt auf Modul-Ebene statt in einem useRef: sonst
+ * verwirft jeder Remount (siehe oben) alle bereits geladenen Image-Objekte
+ * und erzwingt einen kompletten Neuaufbau – jede Sorte zeigt dann kurz
+ * wieder den Fallback-Kreis, bis sie erneut geladen hat. Bei vielen Sorten
+ * oder langsamer Verbindung kann das sichtbar hängen bleiben (eine Sorte
+ * bleibt dauerhaft als Kreis statt der echten Illustration).
+ */
+let sharedImageCache: Record<string, HTMLImageElement> = {}
+
+/**
  * Auch Schwerkraft-Ziel/-Zustand und die iOS-Berechtigung leben auf Modul-Ebene:
  * StartScreen (und damit SandCanvas) unmountet bei JEDER Navigation weg von
  * "start" (Fokus läuft, Ernte, Pause …) und remountet beim Zurückkehren. Wären
@@ -141,6 +151,25 @@ const FRUIT_COLOR: Partial<Record<FruitType, string>> = {
   radish: '#FF6B84',
   onion: '#D888C7',
   potato: '#C99A6B',
+  banana: '#FFE066',
+  lime: '#A8D96B',
+  pineapple: '#FFC94A',
+  melon: '#F5D65C',
+  kiwi: '#8FB93E',
+  mango: '#FFB13B',
+  pear: '#C7D96B',
+  plum: '#8C6BB0',
+  pomegranate: '#C43B4E',
+  cabbage: '#A8D98A',
+  cucumber: '#6FA96C',
+  bellpepper: '#FF6B4A',
+  kale: '#4C8A52',
+  garlic: '#F1EAD9',
+  sweetpotato: '#D97B4A',
+  chili: '#E8433A',
+  cauliflower: '#F1EAD9',
+  leek: '#8FC96B',
+  turnip: '#E8D9E8',
 }
 
 const HAPTIC_MIN_SPEED = 0.6
@@ -153,7 +182,6 @@ const HAPTIC_THROTTLE_MS = 150
  */
 export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitType[]; hapticsEnabled: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const imgCacheRef = useRef<Record<string, HTMLImageElement>>({})
   const sizeRef = useRef({ w: 0, h: 0 })
   const hapticsRef = useRef(hapticsEnabled)
   hapticsRef.current = hapticsEnabled
@@ -187,11 +215,11 @@ export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitTy
     function getFruitImage(type: FruitType): HTMLImageElement | null {
       const src = fruitImageSrc(type)
       if (!src) return null
-      const cached = imgCacheRef.current[type]
+      const cached = sharedImageCache[type]
       if (cached) return cached
       const img = new Image()
       img.src = src
-      imgCacheRef.current[type] = img
+      sharedImageCache[type] = img
       return img
     }
 
@@ -307,7 +335,15 @@ export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitTy
       particles.forEach((p) => {
         const img = getFruitImage(p.type)
         if (img && img.complete && img.naturalWidth) {
-          ctx!.drawImage(img, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2)
+          // Seitenverhältnis erhalten (die PNGs sind nicht quadratisch) –
+          // sonst werden Sorten wie Kiwi/Ananas sichtbar in die Breite oder
+          // Höhe gestaucht, weil drawImage sie sonst stur in ein p.r*2
+          // großes Quadrat zwingt.
+          const diameter = p.r * 2
+          const scale = Math.min(diameter / img.naturalWidth, diameter / img.naturalHeight)
+          const dw = img.naturalWidth * scale
+          const dh = img.naturalHeight * scale
+          ctx!.drawImage(img, p.x - dw / 2, p.y - dh / 2, dw, dh)
         } else {
           ctx!.beginPath()
           ctx!.arc(p.x, p.y, p.r, 0, Math.PI * 2)

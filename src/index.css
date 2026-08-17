@@ -39,6 +39,30 @@ body {
   min-height: 100dvh;
 }
 
+/*
+ * Erzwingt Hochformat rein per CSS, unabhängig vom Gerät/Browser: die App
+ * ist als reine Fokuszeit-App nie für Querformat gedacht, aber
+ * screen.orientation.lock() (useLockPortrait.ts) funktioniert nur im
+ * Vollbild- bzw. zum Homescreen hinzugefügten Modus – in einem normalen
+ * Browser-Tab dreht sich die Seite sonst mit dem Gerät mit, sobald man es
+ * neigt (genau das soll beim Sanduhr-Effekt aber NICHT passieren, nur das
+ * Obst/Gemüse soll auf die Neigung reagieren). Diese Technik rotiert den
+ * gesamten Inhalt gegen die Browser-eigene Drehung, damit er visuell immer
+ * im Hochformat bleibt, komplett ohne spezielle Berechtigung oder API.
+ */
+@media screen and (orientation: landscape) {
+  #root {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100vh;
+    height: 100vw;
+    transform: rotate(-90deg);
+    transform-origin: left top;
+    overflow-x: hidden;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
