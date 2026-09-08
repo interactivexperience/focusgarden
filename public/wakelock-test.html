@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wake-Lock-Diagnose</title>
+    <style>
+      body {
+        font-family: -apple-system, system-ui, sans-serif;
+        padding: 20px;
+        background: #eaf4e4;
+        color: #3d3a34;
+      }
+      h1 {
+        font-size: 18px;
+      }
+      button {
+        font-size: 16px;
+        padding: 14px 20px;
+        border-radius: 12px;
+        border: none;
+        background: #4c8a52;
+        color: white;
+        font-weight: bold;
+        width: 100%;
+        margin: 12px 0;
+      }
+      .row {
+        background: white;
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin: 6px 0;
+        font-size: 14px;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .row b {
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+      #log {
+        white-space: pre-wrap;
+        background: #222;
+        color: #0f0;
+        font-family: monospace;
+        font-size: 12px;
+        padding: 10px;
+        border-radius: 8px;
+        margin-top: 16px;
+        max-height: 260px;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔒 Wake-Lock-Diagnose (Fokusgarten)</h1>
+
+    <div class="row"><span>navigator.wakeLock vorhanden?</span><b id="hasApi">–</b></div>
+    <div class="row"><span>Status</span><b id="status">noch nicht angefragt</b></div>
+    <div class="row"><span>Sekunden seit Anfrage</span><b id="elapsed">–</b></div>
+    <div class="row"><span>Sichtbarkeitswechsel gezählt</span><b id="visCount">0</b></div>
+    <div class="row"><span>Release-Events gezählt</span><b id="releaseCount">0</b></div>
+
+    <button id="askBtn">Wake Lock anfragen</button>
+    <p style="font-size:12.5px; line-height:1.5;">
+      Nach dem Antippen: Bildschirm NICHT manuell sperren (Seitentaste), einfach
+      liegen lassen und warten, ob er von selbst dunkel wird. Diese Seite läuft
+      als normaler Safari-Tab, genau wie die Fokusgarten-App. Bitte danach kurz
+      berichten, was in "Status" steht, sowie ob/wann der Screen trotzdem
+      dunkel wurde.
+    </p>
+
+    <div id="log"></div>
+
+    <script>
+      const log = (msg) => {
+        const el = document.getElementById('log')
+        const t = new Date().toLocaleTimeString('de-DE')
+        el.textContent += `[${t}] ${msg}\n`
+        el.scrollTop = el.scrollHeight
+      }
+
+      const hasApi = 'wakeLock' in navigator
+      document.getElementById('hasApi').textContent = hasApi ? 'ja' : 'nein'
+      if (!hasApi) log('navigator.wakeLock gibt es in diesem Browser nicht.')
+
+      let sentinel = null
+      let requestedAt = null
+      let visCount = 0
+      let releaseCount = 0
+
+      function setStatus(s) {
+        document.getElementById('status').textContent = s
+      }
+
+      async function requestLock() {
+        if (!hasApi) return
+        try {
+          log('Fordere Wake Lock an …')
+          const lock = await navigator.wakeLock.request('screen')
+          sentinel = lock
+          requestedAt = Date.now()
+          setStatus('aktiv (erteilt)')
+          log('Wake Lock ERTEILT.')
+          lock.addEventListener('release', () => {
+            releaseCount++
+            document.getElementById('releaseCount').textContent = String(releaseCount)
+            setStatus('released (vom System freigegeben)')
+            log('Wake Lock wurde vom System freigegeben (release-Event).')
+          })
+        } catch (err) {
+          setStatus('FEHLGESCHLAGEN: ' + err.name + ' – ' + err.message)
+          log('Wake Lock fehlgeschlagen: ' + err.name + ': ' + err.message)
+        }
+      }
+
+      document.getElementById('askBtn').addEventListener('click', requestLock)
+
+      document.addEventListener('visibilitychange', () => {
+        visCount++
+        document.getElementById('visCount').textContent = String(visCount)
+        log('visibilitychange -> ' + document.visibilityState)
+        if (document.visibilityState === 'visible' && hasApi && !sentinel) {
+          log('Seite wieder sichtbar, kein aktiver Lock -> versuche erneut anzufragen.')
+          requestLock()
+        }
+      })
+
+      setInterval(() => {
+        if (requestedAt) {
+          document.getElementById('elapsed').textContent = Math.round((Date.now() - requestedAt) / 1000) + 's'
+        }
+      }, 1000)
+
+      log('Diagnose-Seite geladen. User-Agent: ' + navigator.userAgent)
+    </script>
+  </body>
+</html>
