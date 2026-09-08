@@ -58,7 +58,13 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
       setPull((current) => {
         if (current >= THRESHOLD) {
           setRefreshing(true)
-          window.location.reload()
+          // Kein einfaches location.reload(): in der zum Homescreen
+          // hinzugefügten Version (WKWebView) kann das trotzdem eine
+          // zwischengespeicherte, veraltete index.html liefern – die App
+          // wirkt dann "eingefroren", bis man das Icon löscht und neu
+          // hinzufügt. Ein Cache-Buster in der URL zwingt einen echten
+          // Netzwerk-Abruf statt eines Cache-Treffers.
+          window.location.href = `${window.location.pathname}?_=${Date.now()}`
         } else {
           return 0
         }
