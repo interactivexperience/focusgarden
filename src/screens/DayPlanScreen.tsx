@@ -39,9 +39,35 @@ const BLOCK_LABEL: Record<DayPlanBlock['type'], string> = {
   meeting: 'Termin',
 }
 
-function BlockRow({ block }: { block: DayPlanBlock }) {
+const BREAK_ADJUST_STEP = 5
+const BREAK_MIN_MINUTES = 5
+
+/** Verschiebt alle Blöcke nach `fromIndex` innerhalb desselben Zeitfensters
+ *  (bis zum nächsten fest verankerten Termin oder Listenende) um `delta`
+ *  Minuten – Termine selbst haben feste Uhrzeiten und werden nie verschoben. */
+function shiftFollowing(blocks: DayPlanBlock[], fromIndex: number, delta: number): DayPlanBlock[] {
+  let boundary = blocks.length
+  for (let i = fromIndex + 1; i < blocks.length; i++) {
+    if (blocks[i].type === 'meeting') {
+      boundary = i
+      break
+    }
+  }
+  return blocks.map((b, i) => (i > fromIndex && i < boundary ? { ...b, start: b.start + delta, end: b.end + delta } : b))
+}
+
+function BlockRow({
+  block,
+  onAdjust,
+  onDelete,
+}: {
+  block: DayPlanBlock
+  onAdjust?: (deltaMinutes: number) => void
+  onDelete?: () => void
+}) {
   const isFocus = block.type === 'focus'
   const isMeeting = block.type === 'meeting'
+  const isBreak = block.type === 'break' || block.type === 'longbreak'
   const label = isMeeting ? (block.title?.trim() || 'Termin') : `${BLOCK_LABEL[block.type]} · ${block.minutes} Min`
   return (
     <div
@@ -57,6 +83,35 @@ function BlockRow({ block }: { block: DayPlanBlock }) {
         {minutesToClock(block.start)}–{minutesToClock(block.end)}
       </div>
       <div className="text-[13px] font-bold flex-1 min-w-0 truncate">{label}</div>
+      {isBreak && onAdjust && onDelete && (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => onAdjust(-BREAK_ADJUST_STEP)}
+            disabled={block.minutes <= BREAK_MIN_MINUTES}
+            aria-label="Pause verkürzen"
+            className="w-6 h-6 rounded-full border-[1.5px] border-[#F0DFA0] bg-white text-[13px] text-ink-soft disabled:opacity-30 active:scale-90 transition-transform duration-150"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => onAdjust(BREAK_ADJUST_STEP)}
+            aria-label="Pause verlängern"
+            className="w-6 h-6 rounded-full border-[1.5px] border-[#F0DFA0] bg-white text-[13px] text-ink-soft active:scale-90 transition-transform duration-150"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            aria-label="Pause entfernen"
+            className="p-1 -mr-1 active:scale-90 active:opacity-60 transition-all duration-150"
+          >
+            <AppIcon name="trash" size={14} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -68,6 +123,7 @@ export function DayPlanScreen() {
   const [meetings, setMeetings] = useState<MeetingDraft[]>([])
   const [lunchBreakMinutes, setLunchBreakMinutes] = useState(DEFAULT_LUNCH_BREAK_MINUTES)
   const [result, setResult] = useState<DayPlanResult | null>(null)
+  const [editableBlocks, setEditableBlocks] = useState<DayPlanBlock[]>([])
 
   function addMeeting() {
     setMeetings((m) => [...m, newMeeting()])
@@ -100,15 +156,41 @@ export function DayPlanScreen() {
     const inputs = meetings
       .filter((m) => m.start && m.end)
       .map((m) => ({ start: clockToMinutes(m.start), end: clockToMinutes(m.end), title: m.title.trim() || undefined }))
-    setResult(buildDayPlan(clockToMinutes(workStart), clockToMinutes(workEnd), inputs, lunchBreakMinutes))
+    const r = buildDayPlan(clockToMinutes(workStart), clockToMinutes(workEnd), inputs, lunchBreakMinutes)
+    setResult(r)
+    setEditableBlocks(r.blocks)
   }
 
   function handleApply() {
-    if (!result) return
-    applyDayPlan(result.blocks)
+    applyDayPlan(editableBlocks)
   }
 
-  const summary = result ? planSummary(result.blocks) : null
+  /** Pause verkürzen/verlängern (5-Min-Schritte) – alle Blöcke danach im
+   *  selben Zeitfenster verschieben sich mit, Termine bleiben unangetastet. */
+  function adjustBreak(index: number, deltaMinutes: number) {
+    setEditableBlocks((blocks) => {
+      const block = blocks[index]
+      if (block.type !== 'break' && block.type !== 'longbreak') return blocks
+      const newMinutes = Math.max(BREAK_MIN_MINUTES, block.minutes + deltaMinutes)
+      const delta = newMinutes - block.minutes
+      if (delta === 0) return blocks
+      const updated = blocks.map((b, i) => (i === index ? { ...b, minutes: newMinutes, end: b.end + delta } : b))
+      return shiftFollowing(updated, index, delta)
+    })
+  }
+
+  /** Pause komplett entfernen – alle Blöcke danach im selben Zeitfenster
+   *  rücken entsprechend nach vorn. */
+  function deleteBreak(index: number) {
+    setEditableBlocks((blocks) => {
+      const block = blocks[index]
+      if (block.type !== 'break' && block.type !== 'longbreak') return blocks
+      const shifted = shiftFollowing(blocks, index, -block.minutes)
+      return shifted.filter((_, i) => i !== index)
+    })
+  }
+
+  const summary = editableBlocks.length > 0 ? planSummary(editableBlocks) : null
   const focusHours = summary ? Math.floor(summary.focusMinutes / 60) : 0
   const focusMins = summary ? summary.focusMinutes % 60 : 0
 
@@ -301,8 +383,13 @@ export function DayPlanScreen() {
           )}
 
           <div className="flex flex-col gap-2">
-            {result.blocks.map((b, i) => (
-              <BlockRow key={`${b.type}-${b.start}-${i}`} block={b} />
+            {editableBlocks.map((b, i) => (
+              <BlockRow
+                key={`${b.type}-${b.start}-${i}`}
+                block={b}
+                onAdjust={(delta) => adjustBreak(i, delta)}
+                onDelete={() => deleteBreak(i)}
+              />
             ))}
           </div>
 
