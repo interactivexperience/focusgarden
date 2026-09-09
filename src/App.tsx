@@ -1,5 +1,6 @@
 import { BottomNav } from './components/BottomNav'
 import { PullToRefresh } from './components/PullToRefresh'
+import { UpdateBanner } from './components/UpdateBanner'
 import { useLockPortrait } from './hooks/useLockPortrait'
 import { BreakScreen } from './screens/BreakScreen'
 import { DayPlanScreen } from './screens/DayPlanScreen'
@@ -22,6 +23,7 @@ function AppShell() {
 
   return (
     <div className="flex flex-col h-dvh bg-bg-app mx-auto max-w-[480px] overflow-hidden">
+      <UpdateBanner />
       <PullToRefresh>
         <div className="flex-1 flex flex-col relative overflow-hidden">
           {(state.screen === 'start' || state.screen === 'timeSheet') && <StartScreen />}
