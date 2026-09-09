@@ -95,6 +95,14 @@ export function SettingsScreen({ onOpenWidgetPreview }: { onOpenWidgetPreview: (
       >
         Widget-Vorschau ansehen
       </button>
+
+      {/* Eindeutige Versions-Kennung, damit sich bei Support-Fragen sofort
+       *  prüfen lässt, ob ein Gerät wirklich die neueste Version geladen hat
+       *  – wichtig, da es keinen Service Worker gibt und iOS im Homescreen-
+       *  Modus die App oft nur pausiert statt neu zu laden. */}
+      <div className="mt-6 self-center text-[9.5px] text-ink-faint font-semibold tabular-nums">
+        Version {__BUILD_ID__}
+      </div>
     </div>
   )
 }

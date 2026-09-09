@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const CHECK_INTERVAL_MS = 2 * 60_000
+const CHECK_INTERVAL_MS = 30_000
 
 /**
  * Zeigt ein Banner, sobald eine neuere Version deployt wurde, als die
