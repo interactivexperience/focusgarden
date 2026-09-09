@@ -31,6 +31,10 @@ const LONG_SESSION_BREAK = 10
 const LUNCH_START = 12 * 60
 const LUNCH_END = 14 * 60
 const LUNCH_MIN_OVERLAP = 15
+export const DEFAULT_LUNCH_BREAK_MINUTES = 60
+export const LUNCH_BREAK_MIN_MINUTES = 15
+export const LUNCH_BREAK_MAX_MINUTES = 120
+export const LUNCH_BREAK_STEP_MINUTES = 15
 
 export function clockToMinutes(clock: string): number {
   const [h, m] = clock.split(':').map(Number)
@@ -70,19 +74,31 @@ function fillWindow(start: number, end: number): DayPlanBlock[] {
   return buildChain(start, end, LONG_SESSION_FOCUS, LONG_SESSION_BREAK)
 }
 
-/** Zerlegt ein Fenster an der Mittagszeit (12–14 Uhr) in Vor-/Nach-Teile plus einen expliziten Mittagspause-Block. */
-function splitAroundLunch(start: number, end: number): { workable: [number, number][]; lunch: DayPlanBlock | null } {
+/**
+ * Zerlegt ein Fenster an der Mittagszeit (12–14 Uhr) in Vor-/Nach-Teile plus
+ * einen expliziten Mittagspause-Block. Die Pause dauert `lunchBreakMinutes`
+ * (nutzereinstellbar), beginnt am Anfang der Überschneidung mit dem 12–14-Uhr-
+ * Fenster – der Rest der Überschneidung (falls die Pause kürzer als 2h ist)
+ * fließt zurück in den "danach"-Teil und wird ganz normal weiter befüllt,
+ * statt ungenutzt zu bleiben.
+ */
+function splitAroundLunch(
+  start: number,
+  end: number,
+  lunchBreakMinutes: number,
+): { workable: [number, number][]; lunch: DayPlanBlock | null } {
   const overlapStart = Math.max(start, LUNCH_START)
   const overlapEnd = Math.min(end, LUNCH_END)
   if (overlapEnd - overlapStart < LUNCH_MIN_OVERLAP) {
     return { workable: [[start, end]], lunch: null }
   }
+  const lunchEnd = overlapStart + Math.min(lunchBreakMinutes, overlapEnd - overlapStart)
   const workable: [number, number][] = []
   if (overlapStart > start) workable.push([start, overlapStart])
-  if (end > overlapEnd) workable.push([overlapEnd, end])
+  if (end > lunchEnd) workable.push([lunchEnd, end])
   return {
     workable,
-    lunch: { type: 'break', start: overlapStart, end: overlapEnd, minutes: overlapEnd - overlapStart, title: 'Mittagspause' },
+    lunch: { type: 'break', start: overlapStart, end: lunchEnd, minutes: lunchEnd - overlapStart, title: 'Mittagspause' },
   }
 }
 
@@ -100,7 +116,12 @@ function mergeIntervals(intervals: [number, number][]): [number, number][] {
   return merged
 }
 
-export function buildDayPlan(workStart: number, workEnd: number, meetings: MeetingInput[]): DayPlanResult {
+export function buildDayPlan(
+  workStart: number,
+  workEnd: number,
+  meetings: MeetingInput[],
+  lunchBreakMinutes: number = DEFAULT_LUNCH_BREAK_MINUTES,
+): DayPlanResult {
   if (workEnd <= workStart) {
     return { blocks: [], warning: 'Arbeitsende muss nach dem Arbeitsbeginn liegen.' }
   }
@@ -125,7 +146,7 @@ export function buildDayPlan(workStart: number, workEnd: number, meetings: Meeti
 
   const scheduledBlocks: DayPlanBlock[] = []
   for (const [s, e] of freeWindows) {
-    const { workable, lunch } = splitAroundLunch(s, e)
+    const { workable, lunch } = splitAroundLunch(s, e, lunchBreakMinutes)
     if (lunch) scheduledBlocks.push(lunch)
     for (const [ws, we] of workable) scheduledBlocks.push(...fillWindow(ws, we))
   }

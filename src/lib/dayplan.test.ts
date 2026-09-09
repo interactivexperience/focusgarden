@@ -84,14 +84,49 @@ check('workEnd before workStart yields warning', buildDayPlan(600, 500, []).warn
   check('both meeting blocks still individually present', blocks.filter((b) => b.type === 'meeting').length, 2)
 }
 
-// --- lunch window: explicit lunch break, no focus block placed directly over it ---
+// --- lunch window: default 60min break, starts at the overlap, no focus block over it ---
 {
   const { blocks } = buildDayPlan(660, 900, []) // 11:00-15:00, spans the 12:00-14:00 lunch window
   const lunch = blocks.find((b) => b.title === 'Mittagspause')
   check('lunch block exists', Boolean(lunch), true)
-  check('lunch block spans exactly 12:00-14:00', lunch, { type: 'break', start: 720, end: 840, minutes: 120, title: 'Mittagspause' })
-  // 11:00-12:00 (60min) before lunch -> pomodoro chain; 14:00-15:00 (60min) after -> pomodoro chain
-  check('no focus block overlaps the lunch window', blocks.every((b) => !(b.type === 'focus' && b.start < 840 && b.end > 720)), true)
+  check('default lunch break is 60min, starting at the overlap (12:00-13:00)', lunch, {
+    type: 'break',
+    start: 720,
+    end: 780,
+    minutes: 60,
+    title: 'Mittagspause',
+  })
+  // the leftover 13:00-14:00 (part of the old 12-14 window not used by the
+  // shorter break) flows back into the "after" segment and gets scheduled normally
+  check('no focus block overlaps the (now shorter) lunch break', blocks.every((b) => !(b.type === 'focus' && b.start < 780 && b.end > 720)), true)
+  check('some focus block exists between 13:00 and 15:00 (leftover lunch-window time reused)', blocks.some((b) => b.type === 'focus' && b.start >= 780), true)
+}
+
+// --- lunch window: custom (shorter) duration is respected ---
+{
+  const { blocks } = buildDayPlan(660, 900, [], 30) // same window, but only a 30min lunch break requested
+  const lunch = blocks.find((b) => b.title === 'Mittagspause')
+  check('custom 30min lunch break duration is respected', lunch, {
+    type: 'break',
+    start: 720,
+    end: 750,
+    minutes: 30,
+    title: 'Mittagspause',
+  })
+}
+
+// --- lunch window: requested duration longer than the available overlap gets capped ---
+{
+  // window only overlaps the 12-14 lunch zone by 20 minutes (13:40-15:00 window's start clipped to 13:40)
+  const { blocks } = buildDayPlan(820, 900, [], 60) // 13:40-15:00, only 20min inside 12-14
+  const lunch = blocks.find((b) => b.title === 'Mittagspause')
+  check('requested 60min lunch break capped to the 20min available overlap', lunch, {
+    type: 'break',
+    start: 820,
+    end: 840,
+    minutes: 20,
+    title: 'Mittagspause',
+  })
 }
 
 // --- lunch window: only a sliver overlap (<15min) is NOT treated as a dedicated lunch break ---

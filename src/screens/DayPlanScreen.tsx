@@ -1,6 +1,17 @@
 import { useState } from 'react'
 import { AppIcon } from '../lib/assets'
-import { buildDayPlan, clockToMinutes, minutesToClock, planSummary, type DayPlanBlock, type DayPlanResult } from '../lib/dayplan'
+import {
+  buildDayPlan,
+  clockToMinutes,
+  DEFAULT_LUNCH_BREAK_MINUTES,
+  LUNCH_BREAK_MAX_MINUTES,
+  LUNCH_BREAK_MIN_MINUTES,
+  LUNCH_BREAK_STEP_MINUTES,
+  minutesToClock,
+  planSummary,
+  type DayPlanBlock,
+  type DayPlanResult,
+} from '../lib/dayplan'
 import { useFocusGarden } from '../state/store'
 
 interface MeetingDraft {
@@ -48,6 +59,7 @@ export function DayPlanScreen() {
   const [workStart, setWorkStart] = useState('09:00')
   const [workEnd, setWorkEnd] = useState('17:00')
   const [meetings, setMeetings] = useState<MeetingDraft[]>([])
+  const [lunchBreakMinutes, setLunchBreakMinutes] = useState(DEFAULT_LUNCH_BREAK_MINUTES)
   const [result, setResult] = useState<DayPlanResult | null>(null)
 
   function addMeeting() {
@@ -64,7 +76,7 @@ export function DayPlanScreen() {
     const inputs = meetings
       .filter((m) => m.start && m.end)
       .map((m) => ({ start: clockToMinutes(m.start), end: clockToMinutes(m.end), title: m.title.trim() || undefined }))
-    setResult(buildDayPlan(clockToMinutes(workStart), clockToMinutes(workEnd), inputs))
+    setResult(buildDayPlan(clockToMinutes(workStart), clockToMinutes(workEnd), inputs, lunchBreakMinutes))
   }
 
   function handleApply() {
@@ -115,6 +127,37 @@ export function DayPlanScreen() {
                 onChange={(e) => setWorkEnd(e.target.value)}
                 className="flex-1 min-w-0 rounded-xl border-[1.5px] border-line px-3 py-2.5 text-[14px] font-bold text-ink bg-white"
               />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl px-4 py-3.5 shadow-[0_4px_14px_rgba(61,58,52,0.07)]">
+            <div className="font-bold text-[13px] mb-0.5">Mittagspause</div>
+            <div className="text-[11px] text-ink-soft font-semibold mb-3">
+              Bei Überschneidung mit 12:00–14:00 automatisch eingeplant
+            </div>
+            <div className="flex items-center justify-center gap-5">
+              <button
+                type="button"
+                onClick={() => setLunchBreakMinutes((m) => Math.max(LUNCH_BREAK_MIN_MINUTES, m - LUNCH_BREAK_STEP_MINUTES))}
+                disabled={lunchBreakMinutes <= LUNCH_BREAK_MIN_MINUTES}
+                className="w-9 h-9 rounded-full border-[1.5px] border-line bg-white text-[15px] text-ink disabled:opacity-30 transition-transform duration-150 active:scale-90"
+              >
+                −
+              </button>
+              <div className="font-display text-[21px] font-bold min-w-[76px] text-center">
+                {lunchBreakMinutes}
+                <small className="block text-[9.5px] text-ink-faint font-bold font-body uppercase tracking-wide">
+                  Minuten
+                </small>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLunchBreakMinutes((m) => Math.min(LUNCH_BREAK_MAX_MINUTES, m + LUNCH_BREAK_STEP_MINUTES))}
+                disabled={lunchBreakMinutes >= LUNCH_BREAK_MAX_MINUTES}
+                className="w-9 h-9 rounded-full border-[1.5px] border-line bg-white text-[15px] text-ink disabled:opacity-30 transition-transform duration-150 active:scale-90"
+              >
+                +
+              </button>
             </div>
           </div>
 
