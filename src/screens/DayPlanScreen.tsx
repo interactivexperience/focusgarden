@@ -240,16 +240,22 @@ export function DayPlanScreen() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] text-ink-faint font-bold uppercase tracking-wide mr-0.5">Dauer</span>
-                    {DURATION_PRESETS.map((d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => setMeetingDuration(m.id, d)}
-                        className="text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-white border-[1.5px] border-line text-ink-soft active:scale-90 transition-transform duration-150"
-                      >
-                        {d} Min
-                      </button>
-                    ))}
+                    {DURATION_PRESETS.map((d) => {
+                      const currentDuration = clockToMinutes(m.end) - clockToMinutes(m.start)
+                      const active = currentDuration === d
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setMeetingDuration(m.id, d)}
+                          className={`text-[10.5px] font-bold px-2.5 py-1 rounded-full border-[1.5px] active:scale-90 transition-all duration-150 ${
+                            active ? 'bg-leaf border-leaf text-white' : 'bg-white border-line text-ink-soft'
+                          }`}
+                        >
+                          {d} Min
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               ))}
