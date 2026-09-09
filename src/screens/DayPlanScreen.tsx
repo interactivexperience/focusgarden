@@ -27,6 +27,11 @@ function newMeeting(): MeetingDraft {
   return { id: `${Date.now()}-${Math.random()}`, start: '10:00', end: '10:30', title: '' }
 }
 
+function currentTimeClock(): string {
+  const now = new Date()
+  return minutesToClock(now.getHours() * 60 + now.getMinutes())
+}
+
 const BLOCK_LABEL: Record<DayPlanBlock['type'], string> = {
   focus: 'Fokus',
   break: 'Pause',
@@ -131,7 +136,17 @@ export function DayPlanScreen() {
           </p>
 
           <div className="bg-white rounded-2xl px-4 py-3.5 shadow-[0_4px_14px_rgba(61,58,52,0.07)]">
-            <div className="font-bold text-[13px] mb-3">Arbeitszeit</div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-bold text-[13px]">Arbeitszeit</div>
+              <button
+                type="button"
+                onClick={() => setWorkStart(currentTimeClock())}
+                className="flex items-center gap-1 text-[11.5px] font-bold text-leaf-dark active:opacity-50 transition-opacity"
+              >
+                <AppIcon name="clock" size={13} />
+                Jetzt
+              </button>
+            </div>
             <div className="flex items-center gap-3">
               <input
                 type="time"
