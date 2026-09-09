@@ -137,6 +137,7 @@ export function DayPlanScreen() {
                 type="time"
                 value={workStart}
                 onChange={(e) => setWorkStart(e.target.value)}
+                onBlur={(e) => setWorkStart(e.target.value)}
                 className="flex-1 min-w-0 rounded-xl border-[1.5px] border-line px-3 py-2.5 text-[14px] font-bold text-ink bg-white"
               />
               <span className="text-ink-faint font-bold">–</span>
@@ -144,6 +145,7 @@ export function DayPlanScreen() {
                 type="time"
                 value={workEnd}
                 onChange={(e) => setWorkEnd(e.target.value)}
+                onBlur={(e) => setWorkEnd(e.target.value)}
                 className="flex-1 min-w-0 rounded-xl border-[1.5px] border-line px-3 py-2.5 text-[14px] font-bold text-ink bg-white"
               />
             </div>
@@ -205,12 +207,19 @@ export function DayPlanScreen() {
                       type="time"
                       value={m.start}
                       onChange={(e) => updateMeetingStart(m.id, e.target.value)}
+                      // Zusätzlich onBlur: native Zeit-Rad-Picker (v.a. iOS)
+                      // feuern "change" teils erst unzuverlässig/verzögert
+                      // während der Radauswahl – beim Verlassen des Felds
+                      // greift der Wert garantiert, auch falls onChange
+                      // ausbleibt.
+                      onBlur={(e) => updateMeetingStart(m.id, e.target.value)}
                       className="w-[84px] flex-shrink-0 rounded-lg border-[1.5px] border-line px-2 py-1.5 text-[12.5px] font-bold text-ink bg-white"
                     />
                     <input
                       type="time"
                       value={m.end}
                       onChange={(e) => updateMeeting(m.id, { end: e.target.value })}
+                      onBlur={(e) => updateMeeting(m.id, { end: e.target.value })}
                       className="w-[84px] flex-shrink-0 rounded-lg border-[1.5px] border-line px-2 py-1.5 text-[12.5px] font-bold text-ink bg-white"
                     />
                     <input
