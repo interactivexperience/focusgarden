@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { SunflowerIcon, type SunflowerMood } from '../lib/assets'
 import { formatTime } from '../lib/presets'
 import { useFocusGarden } from '../state/store'
 
 const HOLD_MS = 900
+/** Bewegung in px, ab der ein Zeigerkontakt als Wisch-/Drag-Geste zählt statt
+ *  als ruhiger Tap – z.B. das iOS-System-Wischgesture zum App-Wechsel läuft
+ *  über den ganzen Screen und kann sonst fälschlich als kurzer Tap (=Pause)
+ *  gewertet werden. */
+const MOVE_CANCEL_THRESHOLD = 24
 const IDLE_HINT = 'Bildschirm antippen zum Pausieren · Lang halten zum Beenden'
 const PAUSE_HINT = 'Pausiert – zum Fortsetzen tippen'
 /** Je öfter innerhalb einer Sitzung gehalten wird, desto genervter schaut die Sonnenblume. */
@@ -18,16 +23,18 @@ export function RunningScreen() {
   const [holdAttempts, setHoldAttempts] = useState(0)
   const [idleMood, setIdleMood] = useState<SunflowerMood>('happy')
   const holdStartRef = useRef(0)
+  const holdStartPosRef = useRef({ x: 0, y: 0 })
   const holdTimerRef = useRef<number | null>(null)
   // Synchronous guard: pointerup AND pointerleave can both fire for one tap
   // (e.g. hit-test jitter on touch), so React state (which batches/re-renders
   // asynchronously) can't reliably prevent endHold() from running twice.
   const holdActiveRef = useRef(false)
 
-  function startHold() {
+  function startHold(e: PointerEvent) {
     if (stopped || holdActiveRef.current) return
     holdActiveRef.current = true
     holdStartRef.current = Date.now()
+    holdStartPosRef.current = { x: e.clientX, y: e.clientY }
     setHolding(true)
     setHoldAttempts((n) => n + 1)
     holdTimerRef.current = window.setTimeout(() => {
@@ -41,7 +48,7 @@ export function RunningScreen() {
     }, HOLD_MS)
   }
 
-  function endHold() {
+  function endHold(e: PointerEvent) {
     if (!holdActiveRef.current) return
     holdActiveRef.current = false
     if (holdTimerRef.current) {
@@ -49,8 +56,13 @@ export function RunningScreen() {
       holdTimerRef.current = null
     }
     const elapsed = Date.now() - holdStartRef.current
+    const moved = Math.hypot(e.clientX - holdStartPosRef.current.x, e.clientY - holdStartPosRef.current.y)
     setHolding(false)
-    if (elapsed < HOLD_MS && !stopped) {
+    // Nur als abgeschlossenen Tap werten, wenn sich der Kontaktpunkt kaum
+    // bewegt hat – sonst würde z.B. das iOS-Wischgesture zum App-Wechsel
+    // (läuft über den ganzen Screen, endet oft mit pointerleave) fälschlich
+    // als kurzer Tap gewertet und pausiert die Sitzung ungewollt.
+    if (elapsed < HOLD_MS && moved < MOVE_CANCEL_THRESHOLD && !stopped) {
       togglePause()
     }
   }
