@@ -21,6 +21,8 @@ interface MeetingDraft {
   title: string
 }
 
+const DURATION_PRESETS = [15, 30, 60]
+
 function newMeeting(): MeetingDraft {
   return { id: `${Date.now()}-${Math.random()}`, start: '10:00', end: '10:30', title: '' }
 }
@@ -67,6 +69,23 @@ export function DayPlanScreen() {
   }
   function updateMeeting(id: string, patch: Partial<MeetingDraft>) {
     setMeetings((list) => list.map((m) => (m.id === id ? { ...m, ...patch } : m)))
+  }
+  /** Verschiebt die Endzeit mit, wenn die Startzeit geändert wird, statt die
+   *  bisherige Dauer stillschweigend zu verwerfen (z.B. Start 10:00→11:00
+   *  bei einem 30-Min-Termin ergibt weiterhin 11:00–11:30, nicht 11:00–10:30). */
+  function updateMeetingStart(id: string, newStart: string) {
+    setMeetings((list) =>
+      list.map((m) => {
+        if (m.id !== id) return m
+        const duration = Math.max(5, clockToMinutes(m.end) - clockToMinutes(m.start))
+        return { ...m, start: newStart, end: minutesToClock(clockToMinutes(newStart) + duration) }
+      }),
+    )
+  }
+  function setMeetingDuration(id: string, duration: number) {
+    setMeetings((list) =>
+      list.map((m) => (m.id === id ? { ...m, end: minutesToClock(clockToMinutes(m.start) + duration) } : m)),
+    )
   }
   function removeMeeting(id: string) {
     setMeetings((list) => list.filter((m) => m.id !== id))
@@ -180,34 +199,49 @@ export function DayPlanScreen() {
 
             <div className="flex flex-col gap-2.5">
               {meetings.map((m) => (
-                <div key={m.id} className="flex items-center gap-2 bg-[#F7F5EF] rounded-xl px-3 py-2.5">
-                  <input
-                    type="time"
-                    value={m.start}
-                    onChange={(e) => updateMeeting(m.id, { start: e.target.value })}
-                    className="w-[84px] flex-shrink-0 rounded-lg border-[1.5px] border-line px-2 py-1.5 text-[12.5px] font-bold text-ink bg-white"
-                  />
-                  <input
-                    type="time"
-                    value={m.end}
-                    onChange={(e) => updateMeeting(m.id, { end: e.target.value })}
-                    className="w-[84px] flex-shrink-0 rounded-lg border-[1.5px] border-line px-2 py-1.5 text-[12.5px] font-bold text-ink bg-white"
-                  />
-                  <input
-                    type="text"
-                    value={m.title}
-                    onChange={(e) => updateMeeting(m.id, { title: e.target.value })}
-                    placeholder="Titel (optional)"
-                    className="flex-1 min-w-0 rounded-lg border-[1.5px] border-line px-2.5 py-1.5 text-[12.5px] font-semibold text-ink bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeMeeting(m.id)}
-                    aria-label="Termin entfernen"
-                    className="flex-shrink-0 p-1 active:scale-90 active:opacity-60 transition-all duration-150"
-                  >
-                    <AppIcon name="trash" size={16} />
-                  </button>
+                <div key={m.id} className="flex flex-col gap-2 bg-[#F7F5EF] rounded-xl px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="time"
+                      value={m.start}
+                      onChange={(e) => updateMeetingStart(m.id, e.target.value)}
+                      className="w-[84px] flex-shrink-0 rounded-lg border-[1.5px] border-line px-2 py-1.5 text-[12.5px] font-bold text-ink bg-white"
+                    />
+                    <input
+                      type="time"
+                      value={m.end}
+                      onChange={(e) => updateMeeting(m.id, { end: e.target.value })}
+                      className="w-[84px] flex-shrink-0 rounded-lg border-[1.5px] border-line px-2 py-1.5 text-[12.5px] font-bold text-ink bg-white"
+                    />
+                    <input
+                      type="text"
+                      value={m.title}
+                      onChange={(e) => updateMeeting(m.id, { title: e.target.value })}
+                      placeholder="Titel (optional)"
+                      className="flex-1 min-w-0 rounded-lg border-[1.5px] border-line px-2.5 py-1.5 text-[12.5px] font-semibold text-ink bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeMeeting(m.id)}
+                      aria-label="Termin entfernen"
+                      className="flex-shrink-0 p-1 active:scale-90 active:opacity-60 transition-all duration-150"
+                    >
+                      <AppIcon name="trash" size={16} />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-ink-faint font-bold uppercase tracking-wide mr-0.5">Dauer</span>
+                    {DURATION_PRESETS.map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setMeetingDuration(m.id, d)}
+                        className="text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-white border-[1.5px] border-line text-ink-soft active:scale-90 transition-transform duration-150"
+                      >
+                        {d} Min
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
