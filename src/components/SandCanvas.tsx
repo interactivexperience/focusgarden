@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react'
-import type { FruitType } from '../lib/fruits'
+import type { FruitType, HarvestEntry } from '../lib/fruits'
 import { fruitImageSrc } from '../lib/assets'
 
 interface Particle {
   type: FruitType
+  /** false bei Abbruch/übersprungener Pause – wird ausgegraut dargestellt. */
+  complete: boolean
   x: number
   y: number
   vx: number
@@ -180,7 +182,7 @@ const HAPTIC_THROTTLE_MS = 150
  * Reagiert auf Geräteneigung (mit Maus-Fallback), Canvas-Backing-Buffer wird
  * mit devicePixelRatio skaliert, sonst wirkt es auf Retina-Displays pixelig.
  */
-export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitType[]; hapticsEnabled: boolean }) {
+export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: HarvestEntry[]; hapticsEnabled: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sizeRef = useRef({ w: 0, h: 0 })
   const hapticsRef = useRef(hapticsEnabled)
@@ -194,9 +196,10 @@ export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitTy
       sharedParticles = []
     }
     while (sharedParticles.length < fruitTypes.length) {
-      const type = fruitTypes[sharedParticles.length]
+      const entry = fruitTypes[sharedParticles.length]
       sharedParticles.push({
-        type,
+        type: entry.type,
+        complete: entry.complete,
         x: sizeRef.current.w / 2 + (Math.random() * 40 - 20),
         y: -20 - Math.random() * 30,
         vx: Math.random() * 2 - 1,
@@ -333,6 +336,9 @@ export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitTy
 
       ctx!.clearRect(0, 0, W, H)
       particles.forEach((p) => {
+        // Ausgegraut (Abbruch/übersprungene Pause): entsättigt und etwas
+        // transparenter, um sich klar von einer echten Ernte abzuheben.
+        ctx!.filter = p.complete ? 'none' : 'grayscale(1) opacity(0.55)'
         const img = getFruitImage(p.type)
         if (img && img.complete && img.naturalWidth) {
           // Seitenverhältnis erhalten (die PNGs sind nicht quadratisch) –
@@ -347,10 +353,11 @@ export function SandCanvas({ fruitTypes, hapticsEnabled }: { fruitTypes: FruitTy
         } else {
           ctx!.beginPath()
           ctx!.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-          ctx!.fillStyle = FRUIT_COLOR[p.type] || '#8FC96B'
+          ctx!.fillStyle = p.complete ? FRUIT_COLOR[p.type] || '#8FC96B' : '#B3AC9E'
           ctx!.fill()
         }
       })
+      ctx!.filter = 'none'
       rafId = requestAnimationFrame(step)
     }
     rafId = requestAnimationFrame(step)

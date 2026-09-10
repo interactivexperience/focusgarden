@@ -1,5 +1,5 @@
 import type { DayPlanBlock } from './dayplan'
-import type { FruitType } from './fruits'
+import type { FruitType, HarvestEntry } from './fruits'
 
 export interface SoundState {
   focusEnd: boolean
@@ -15,7 +15,14 @@ export interface StoredDayPlan {
 }
 
 export interface StoredState {
-  todaysHarvest: FruitType[]
+  /** Ältere gespeicherte Zustände enthalten hier noch reine FruitType-Strings
+   *  statt HarvestEntry-Objekte (vor Einführung von unvollständigen Ernten) –
+   *  initState() in store.tsx normalisiert das beim Laden. */
+  todaysHarvest: HarvestEntry[] | FruitType[]
+  /** Reine Fokuszeit (Sekunden) des heutigen Tages, unabhängig davon, ob
+   *  todaysHarvest auch unvollständige Einträge (Abbruch, übersprungene Pause)
+   *  enthält – Grundlage für die "Fokuszeit heute"-Statistik. */
+  todaysFocusSeconds: number
   totalSeconds: number
   pendingMinutes: number
   soundState: SoundState

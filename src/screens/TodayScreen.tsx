@@ -34,8 +34,11 @@ function formatDate(d: Date): string {
 export function TodayScreen() {
   const { state } = useFocusGarden()
   const layout = useMemo(() => bouquetLayout(state.todaysHarvest.length), [state.todaysHarvest.length])
-  const varietyCount = useMemo(() => new Set(state.todaysHarvest).size, [state.todaysHarvest])
-  const focusHours = (state.todaysHarvest.length * (state.totalSeconds / 3600)).toFixed(1)
+  const varietyCount = useMemo(
+    () => new Set(state.todaysHarvest.map((h) => h.type)).size,
+    [state.todaysHarvest],
+  )
+  const focusHours = (state.todaysFocusSeconds / 3600).toFixed(1)
 
   return (
     <div className="flex-1 flex flex-col px-5 pt-9 pb-24 overflow-y-auto">
@@ -59,7 +62,11 @@ export function TodayScreen() {
                   transform: `translate(-50%, -50%) rotate(${item.rot}deg)`,
                 }}
               >
-                <FruitIcon type={state.todaysHarvest[i]} size={item.size} />
+                <FruitIcon
+                  type={state.todaysHarvest[i].type}
+                  size={item.size}
+                  className={state.todaysHarvest[i].complete ? undefined : 'grayscale opacity-60'}
+                />
               </div>
             ))
           )}

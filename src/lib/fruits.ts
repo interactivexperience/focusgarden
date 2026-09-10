@@ -41,6 +41,14 @@ export const FRUIT_NAMES = {
 
 export type FruitType = keyof typeof FRUIT_NAMES
 
+/** Ein Eintrag in der Tages-Ernte: `complete: false` markiert Sorten, die nicht
+ *  durch eine abgeschlossene Fokuszeit erarbeitet wurden (Abbruch, Pause
+ *  übersprungen) – sie werden ausgegraut dargestellt statt wie echte Ernten. */
+export interface HarvestEntry {
+  type: FruitType
+  complete: boolean
+}
+
 export const FRUIT_CATEGORY: Record<FruitType, 'obst' | 'gemuese'> = {
   tomato: 'gemuese',
   strawberry: 'obst',

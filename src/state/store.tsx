@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useRef, type ReactNode } from 'react'
 import { nextActionableBlock, type DayPlanBlock } from '../lib/dayplan'
-import { type FruitType, randomFruitType } from '../lib/fruits'
+import { type FruitType, type HarvestEntry, randomFruitType } from '../lib/fruits'
 import { CYCLES_UNTIL_LONG_BREAK, longBreakMinutes, presetForMinutes, TIME_PRESETS } from '../lib/presets'
 import { loadStoredState, saveStoredState, todayDateKey, type SoundState, type StoredState } from '../lib/storage'
 import { playChime } from '../lib/sound'
@@ -35,7 +35,11 @@ function breakMinutesForSession(totalSeconds: number, selectedPresetName: string
 
 interface State {
   screen: Screen
-  todaysHarvest: FruitType[]
+  todaysHarvest: HarvestEntry[]
+  /** Reine Fokuszeit (Sekunden) des heutigen Tages – im Gegensatz zu
+   *  todaysHarvest.length nicht durch Pausen-Ernten oder Abbruch-Ernten
+   *  verfälscht, bleibt Grundlage für die "Fokuszeit heute"-Statistik. */
+  todaysFocusSeconds: number
   totalSeconds: number
   remainingSeconds: number
   pendingMinutes: number
@@ -72,6 +76,21 @@ interface State {
 const DEFAULT_MINUTES = 25
 const DEFAULT_SOUND: SoundState = { focusEnd: true, breakEnd: true, haptics: false }
 
+/** Ältere gespeicherte Zustände enthalten todaysHarvest noch als reine
+ *  FruitType-Strings statt HarvestEntry-Objekte – als vollständig geerntet
+ *  behandeln, damit bestehende Bouquets nicht rückwirkend ausgegraut werden. */
+function normalizeHarvestEntries(raw: HarvestEntry[] | FruitType[] | undefined): HarvestEntry[] {
+  if (!raw) return []
+  return raw.map((item) => (typeof item === 'string' ? { type: item, complete: true } : item))
+}
+
+/** Hängt einen neuen Ernte-Eintrag an todaysHarvest an – berücksichtigt dabei
+ *  denselben Tageswechsel-Sonderfall wie SYNC_TIME (siehe dort). */
+function withNewHarvestEntry(state: State, entry: HarvestEntry): HarvestEntry[] {
+  const today = todayDateKey()
+  return state.activeDayKey === today ? [...state.todaysHarvest, entry] : [entry]
+}
+
 function initState(): State {
   const stored = loadStoredState()
   const today = todayDateKey()
@@ -80,6 +99,7 @@ function initState(): State {
     return {
       screen: 'start',
       todaysHarvest: [],
+      todaysFocusSeconds: 0,
       totalSeconds: DEFAULT_MINUTES * 60,
       remainingSeconds: DEFAULT_MINUTES * 60,
       pendingMinutes: DEFAULT_MINUTES,
@@ -114,7 +134,8 @@ function initState(): State {
 
   return {
     screen: 'start',
-    todaysHarvest: isNewDay ? [] : (stored.todaysHarvest ?? []),
+    todaysHarvest: isNewDay ? [] : normalizeHarvestEntries(stored.todaysHarvest),
+    todaysFocusSeconds: isNewDay ? 0 : (stored.todaysFocusSeconds ?? 0),
     totalSeconds,
     remainingSeconds: totalSeconds,
     pendingMinutes,
@@ -204,7 +225,9 @@ function reducer(state: State, action: Action): State {
       // Falls die App über Mitternacht hinweg offen blieb (kein CHECK_DAY_ROLLOVER
       // dazwischen), hier defensiv den Tages-Eimer für die neue Ernte leeren,
       // statt sie an gestriges todaysHarvest anzuhängen.
-      const todaysHarvest = state.activeDayKey === today ? [...state.todaysHarvest, type] : [type]
+      const todaysHarvest = withNewHarvestEntry(state, { type, complete: true })
+      const todaysFocusSeconds =
+        (state.activeDayKey === today ? state.todaysFocusSeconds : 0) + state.totalSeconds
 
       return {
         ...state,
@@ -213,6 +236,7 @@ function reducer(state: State, action: Action): State {
         sessionPaused: false,
         screen: 'harvest',
         todaysHarvest,
+        todaysFocusSeconds,
         lastHarvestType: type,
         lastHarvestDate: today,
         activeDayKey: today,
@@ -230,6 +254,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         activeDayKey: today,
         todaysHarvest: [],
+        todaysFocusSeconds: 0,
         streak: streakOnNewDay(state.streak, state.lastHarvestDate, today),
         dayPlan: planStillValid ? state.dayPlan : null,
         currentBlockIndex: planStillValid ? state.currentBlockIndex : 0,
@@ -251,7 +276,18 @@ function reducer(state: State, action: Action): State {
     }
 
     case 'RESET_AFTER_STOP':
-      return { ...state, remainingSeconds: state.totalSeconds, sessionEndAt: null, sessionPaused: false, screen: 'start' }
+      // Auch ein abgebrochener Fokus bringt eine Sorte – ausgegraut, um sie von
+      // einer echten Ernte zu unterscheiden, zählt aber nicht in discoveredTypes/
+      // Streak/todaysFocusSeconds (die Fokus-Statistiken bleiben ehrlich).
+      return {
+        ...state,
+        remainingSeconds: state.totalSeconds,
+        sessionEndAt: null,
+        sessionPaused: false,
+        screen: 'start',
+        todaysHarvest: withNewHarvestEntry(state, { type: randomFruitType(), complete: false }),
+        activeDayKey: todayDateKey(),
+      }
 
     case 'REPLAY_HARVEST':
       return { ...state, harvestReplayTick: state.harvestReplayTick + 1 }
@@ -278,11 +314,28 @@ function reducer(state: State, action: Action): State {
       if (state.screen !== 'break' || state.breakEndAt === null) return state
       const remaining = Math.max(0, Math.round((state.breakEndAt - Date.now()) / 1000))
       if (remaining > 0) return { ...state, breakRemainingSeconds: remaining }
-      return { ...state, screen: 'start', breakEndAt: null, breakRemainingSeconds: 0 }
+      // Eine natürlich zu Ende gelaufene Pause bringt ebenfalls eine Sorte
+      // (regulär, nicht ausgegraut) – anders als ein übersprungenes SKIP_BREAK.
+      return {
+        ...state,
+        screen: 'start',
+        breakEndAt: null,
+        breakRemainingSeconds: 0,
+        todaysHarvest: withNewHarvestEntry(state, { type: randomFruitType(), complete: true }),
+        activeDayKey: todayDateKey(),
+      }
     }
 
     case 'SKIP_BREAK':
-      return { ...state, screen: 'start', breakEndAt: null, breakRemainingSeconds: 0 }
+      // Übersprungene Pause: analog zum Abbruch einer Fokuszeit ausgegraut.
+      return {
+        ...state,
+        screen: 'start',
+        breakEndAt: null,
+        breakRemainingSeconds: 0,
+        todaysHarvest: withNewHarvestEntry(state, { type: randomFruitType(), complete: false }),
+        activeDayKey: todayDateKey(),
+      }
 
     case 'APPLY_DAY_PLAN':
       return { ...state, dayPlan: { blocks: action.blocks, dateKey: todayDateKey() }, currentBlockIndex: 0, screen: 'start' }
@@ -447,6 +500,7 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const toPersist: StoredState = {
       todaysHarvest: state.todaysHarvest,
+      todaysFocusSeconds: state.todaysFocusSeconds,
       totalSeconds: state.totalSeconds,
       pendingMinutes: state.pendingMinutes,
       soundState: state.soundState,
@@ -460,6 +514,7 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
     saveStoredState(toPersist)
   }, [
     state.todaysHarvest,
+    state.todaysFocusSeconds,
     state.totalSeconds,
     state.pendingMinutes,
     state.soundState,
