@@ -448,12 +448,16 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
   // Browsern nicht unterstützt oder kann fehlschlagen (z.B. Energiesparmodus) –
   // die Zeitmessung bleibt dank sessionEndAt auch dann korrekt.
   useEffect(() => {
+    type WakeLockSentinelLike = {
+      release: () => Promise<void>
+      addEventListener: (type: 'release', listener: () => void) => void
+    }
     const nav = navigator as Navigator & {
-      wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> }
+      wakeLock?: { request: (type: 'screen') => Promise<WakeLockSentinelLike> }
     }
     if (!nav.wakeLock) return
 
-    let sentinel: { release: () => Promise<void> } | null = null
+    let sentinel: WakeLockSentinelLike | null = null
     let cancelled = false
     const shouldHold = (state.screen === 'running' && !state.sessionPaused) || state.screen === 'break'
 
@@ -465,6 +469,14 @@ export function FocusGardenProvider({ children }: { children: ReactNode }) {
           return
         }
         sentinel = lock
+        // Das System kann den Lock auch ohne Sichtbarkeits-Wechsel freigeben
+        // (z.B. Energiesparmodus, kurzzeitiger Kontrollwechsel an eine andere
+        // App) – dann hier direkt erneut versuchen, statt bis zum nächsten
+        // visibilitychange zu warten.
+        lock.addEventListener('release', () => {
+          sentinel = null
+          if (!cancelled && shouldHold && document.visibilityState === 'visible') void acquire()
+        })
       } catch {
         // Ignorieren – z.B. Energiesparmodus oder Tab nicht sichtbar.
       }
